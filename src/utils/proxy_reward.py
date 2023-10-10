@@ -6,7 +6,7 @@ import networkx as nx
 from scipy.special import gammaln
 import networkx
 
-def compute_bdeu_score(data: pd.DataFrame, graph: nx.DiGraph, alpha: float) -> float:
+def bdeu_score(data: pd.DataFrame, graph: nx.DiGraph, alpha: float) -> float:
     """
     Compute the BDeu score for a Bayesian network structure.
 
