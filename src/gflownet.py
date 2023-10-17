@@ -4,7 +4,7 @@ class Gflow_extrapolate():
         self.edge_flows_dict = {combinations(vocabulary):None}
             
     def predict_edge_flow(self,source_state, target_state):
-        
+        pass 
     
     def backward_reward_propagation(self):
         pass
