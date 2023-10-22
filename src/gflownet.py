@@ -1,8 +1,12 @@
+from transformer import transformer
 class Gflow_extrapolate():
-    def __init__(self):
-        pass
-
-    def backward_reward_propogation(self):
+    def __init__(self,vocabulary):
+        self.edge_flows_dict = {combinations(vocabulary):None}
+            
+    def predict_edge_flow(self,source_state, target_state):
+        pass 
+    
+    def backward_reward_propagation(self):
         pass
 
     def fit_edge_flow(self):
