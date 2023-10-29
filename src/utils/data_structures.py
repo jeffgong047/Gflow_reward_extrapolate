@@ -38,10 +38,16 @@ class samples(sample):
 class Trie:
     def __init__(self):
         self.graph = nx.DiGraph()
-        self.root = "ROOT"
+        self.root = 0
         self.graph.add_node(self.root)
 
     def insert(self, word, weight=1):
+        '''
+
+        :param word: a series of indexes for vocabularies
+        :param weight:
+        :return:
+        '''
         current_node = self.root
         for char in word:
             next_node = current_node + char
