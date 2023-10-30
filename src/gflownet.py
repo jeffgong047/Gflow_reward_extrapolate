@@ -1,6 +1,7 @@
 from transformer import transformer
+from .utils.data_structures import Trie
 class Gflow_extrapolate():
-    def __init__(self,vocabulary,reward):
+    def __init__(self,word):
         '''
 
         :param vocabulary:
@@ -15,17 +16,20 @@ class Gflow_extrapolate():
 
         Need to decide whether use backward_propagation for edge flows or state flows. We can store states in a trie
         '''
+        self.word = word
         self.edge_flows_dict = {combinations_choose2(vocabulary):None}
         self.states_flows_dict = {combinations(vocabulary):None}
         self._rewards = reward
     def predict_edge_flow(self,source_state, target_state):
         pass 
     
-    def backward_reward_propagation(self,state):
+    def backward_reward_propagation(self,samples):
         '''
         We use dynamic programming to get an estimate of edge flows between states
         Notice edge flows can be recursively decomposed into sub-edge flows.
+        Given Trie implementation, backward_reward_propagation is an algorithm to build a Trie (medium of Gflow Network)
         '''
+        
         reacheable_states = next_states(state)
         if not self.states_flows_dict[state]:
             self.states_flows_dict[state] = 0

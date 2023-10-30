@@ -3,35 +3,31 @@ from abc import ABC, abstractmethod
 import ast
 import marisa_trie
 import networkx as nx
-
-class sample(ABC):
-    def __init__(self, array_like):
-        self.sample_seq = jnp.array(array_like)
-        self.len = len(array_like)
-    def back_track(self, back_steps):
-        back_steps +=1
-        return self.sample_seq[self.len-back_steps],
-
-
-
-
-class samples(sample):
-    '''
-    samples class was written in the spirit to organize the training data better for running gflow-extrapolate algorithms
-    Our implementation of samples are based upon strings
-    '''
-    def __init__(self,array_like):
-        self.samples_seq = jpn.array(array_like)
-        self.num_samples = array_like[0]
-        self.samples_structure = self.organize_samples(self.samples_seq)
-    def organize_samples(self,samples):
-        samples_structure = marisa_trie.Trie(samples)
-        return samples_structure
-
-    def samplesWithPrefix(self, prefix):
-        return self.samples_structure.keys(prefix)
-    def samplesPrefixQuery(self, query):
-        return self.samples_structure.prefixes(query)
+#
+#
+#
+# class samples(ABC):
+#     '''
+#     samples class was written in the spirit to organize the training data better for running gflow-extrapolate algorithms
+#     Our implementation of samples are based upon strings
+#     '''
+#     def __init__(self, data, sample_structure):
+#         '''
+#         :param data: Preprocessed data where each data point is a word. Characters are indexes where elements that composed the object mapped to.
+#         :param sample_structure:
+#         notes: Based on sample structure, the data can be transformed to desired format before storing in the suitable data structures
+#         '''
+#         self.samples_seq = jpn.array(array_like)
+#         self.num_samples = array_like[0]
+#         self.samples_structure = self.organize_samples(self.samples_seq)
+#     def organize_samples(self,samples):
+#         samples_structure = marisa_trie.Trie(samples)
+#         return samples_structure
+#
+#     def samplesWithPrefix(self, prefix):
+#         return self.samples_structure.keys(prefix)
+#     def samplesPrefixQuery(self, query):
+#         return self.samples_structure.prefixes(query)
 
 
 
@@ -41,30 +37,28 @@ class Trie:
         self.root = 0
         self.graph.add_node(self.root)
 
-    def insert(self, word, weight=1):
+    def insert(self, sentence):
         '''
-
-        :param word: a series of indexes for vocabularies
+        :param word: a series of characters which are indexes of elements of an object
         :param weight:
         :return:
+        q: how can we make this function more adaptable to other use cases such as including weights?
         '''
-        current_node = self.root
-        for char in word:
-            next_node = current_node + char
-            if not self.graph.has_edge(current_node, next_node):
-                self.graph.add_edge(current_node, next_node, weight=weight, label=char)
-            else:
-                self.graph[current_node][next_node]['weight'] += weight
-            current_node = next_node
-        self.graph.nodes[current_node]['is_end_of_word'] = True
-
-    def search(self, word):
-        current_node = self.root
-        for char in word:
-            next_node = current_node + char
-            if not self.graph.has_edge(current_node, next_node):
+        cursor = self.root
+        for word in sentence:
+            if not self.graph.has_edge(cursor, word):
+                # When initializing the Trie, the weight are used to represent edge flows
+                # Assumption of sample structure and a medium to represent the sample structure should be not be part of the gflow network.
+                self.graph.add_edge(cursor, word)
+            cursor = word
+     #   self.graph.nodes[current_node]['is_end_of_word'] = True
+        # nx.set_node_attributes(G, {0: "red", 1: "blue"}, name="color")
+    def search(self, sentence):
+        cursor = self.root
+        for word in sentence:
+            if not self.graph.has_edge(cursor, word):
                 return False
-            current_node = next_node
+            cursor = word
         return self.graph.nodes[current_node].get('is_end_of_word', False)
 
     # Visualization helper using matplotlib
