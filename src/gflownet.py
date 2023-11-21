@@ -1,8 +1,80 @@
 from transformer import transformer
-from .utils.data_structures import Trie
+from .utils.data_structures import Trie, Trie_node
+from preprocessors import Word
 import random
+
+
+class Gflow_node(Trie_node):
+    def __init__(self,vocab_size):
+        super.__init__(vocab_size)
+        self.flow = None
+
+class Gflow_Trie(Trie):
+    def __init__(self,vocab):
+        self.root = super.__init__()
+        self.vocab = vocab
+
+    def getNode(self):
+        return Gflow_node()
+
+    def _charToIndex(self,ch):
+
+        # private helper function
+        # Converts key current character into index
+        # use only 'a' through 'z' and lower case
+        if ch in self.vocab:
+            index = self.vocab[ch]
+        else:
+            raise Exception('The word is not in the vocabulary')
+        return index
+
+    def get_children(self,node):
+        return node.children
+
+    def get_root(self):
+        return self.root
+
+    def insert(self,sample):
+        '''
+        The inheritance is difficult in this case
+        :param sample:
+        :return:
+        '''
+        key = sample['object']
+        reward = sample['reward']
+        # If not present, inserts key into trie
+        # If the key is prefix of trie node,
+        # just marks leaf node
+        pCrawl = self.root
+        length = len(key)
+        for level in range(length):
+            index = self._charToIndex(key[level])
+            # if current character is not present
+            if not pCrawl.children[index]:
+                pCrawl.children[index] = self.getNode()
+            pCrawl = pCrawl.children[index]
+        # mark last node as leaf
+        pCrawl.isEndOfWord = True
+        pCraw.flow = reward
+
+    def get_edge_flow(self,source,target):
+        state = [source,target]
+        return self.get_state_flow(state)
+
+
+    def get_state_flow(self, state):
+        key = state
+        pCrawl = self.root
+        length = len(key)
+        for level in range(length):
+            index = self._charToIndex(key[level])
+            if not pCrawl.children[index]:
+                raise Exception('The edge does not exist in Gflownet sample structure')
+            pCrawl = pCrawl.children[index]
+        return pCrawl.flow
+
 class Gflow_extrapolate():
-    def __init__(self,word):
+    def __init__(self,args,word,raw_data):
         '''
         Mainly contains two orgain: 1. data structure to hold all the structured edge flows 2. Transformer that can utilize the edge flows to extrapolate
         Algorithms to calculate edge flows and train the transformer to fit the flows
@@ -21,33 +93,53 @@ class Gflow_extrapolate():
         self.word = word
         self.edge_flows_dict = {combinations_choose2(vocabulary):None}
         self.states_flows_dict = {combinations(vocabulary):None}
-        self.env_structure = Trie(samples[data])
+        self.samples = self.word.rawData_to_samples(raw_data,args.format)
+        self.samples_structure = self.build_samples_structures()
         self.transformer = transformer
 
     def predict_edge_flow(self,source_state, target_state):
-        indexes = self.word.element_to_index((source_state,target_state))
-        return self.transformer(self.word.vocabulary(indexes))
-    
-    def backward_reward_propagation(self,samples,propogate_rule='min_entropy'):
+        indexes = self.word.vocabulary([source_state,target_state])
+        embedding = self.word.embed(indexes)
+        return self.transformer(embedding)
+
+    def build_samples_structures(self):
+        Gflow_Trie = Gflow_Trie(self.samples['object'])
+        for s in self.samples:
+            Gflow_Trie.insert(s)
+        return Gflow_Trie
+    def backward_reward_propagation(self, cursor = self.samples_structure.get_root(), propogate_rule='min_entropy'):
         '''
         We use dynamic programming to get an estimate of edge flows between states
         Notice edge flows can be recursively decomposed into sub-edge flows.
         Given Trie implementation, backward_reward_propagation is an algorithm to build a Trie (medium of Gflow Network)
         '''
-        if len(samples)==0:
-            #??? need to handle broadcasting here
-            return samples['reward']
-        reacheable_states = next_states(state)
-        if not self.states_flows_dict[state]:
-            self.states_flows_dict[state] = 0
-            for n_state in reacheable_states:
-                if not self.edge_flows_dict[edge(state,n_state)]:
-                    if propogate_rule =='min_entropy':
-                        p =  random.random()
-                        if p>threshold:
-                            self.states_flows_dict += self.backward_reward_propagation(samples[1:])
-                    elif propogate_rule == 'maximum_entropy':
-                        self.states_flows_dict += self.backward_reward_propagation(samples[1:])
+        if cursor.end_of_Sentence:
+            if current_node.flows != None:
+                raise Exception('The sample is incomplete because it has no reward')
+            return current_node.flows
+        else:
+            childrens = self.samples_structure.get_children(cursor)
+            flow = 0
+            for child in childrens:
+                if child.flow ==None:
+                    child.flow = self.backward_reward_propagation(child,propogate_rule='min_entropy')
+                flow += child.flow
+
+        #
+        # if len(samples)==0:
+        #     #??? need to handle broadcasting here
+        #     return samples['reward']
+        # reacheable_states = next_states(state)
+        # if not self.states_flows_dict[state]:
+        #     self.states_flows_dict[state] = 0
+        #     for n_state in reacheable_states:
+        #         if not self.edge_flows_dict[edge(state,n_state)]:
+        #             if propogate_rule =='min_entropy':
+        #                 p =  random.random()
+        #                 if p>threshold:
+        #                     self.states_flows_dict += self.backward_reward_propagation(samples[1:])
+        #             elif propogate_rule == 'maximum_entropy':
+        #                 self.states_flows_dict += self.backward_reward_propagation(samples[1:])
 
 
     def loss(self, params, target_params, samples):

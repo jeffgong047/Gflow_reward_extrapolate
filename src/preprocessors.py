@@ -2,7 +2,9 @@ import pandas as pd
 import utils.proxy_reward as proxy_reward
 from utils.data_structures import samples
 import torch.nn as nn
-class Word(ABC):
+from torch.nn.utils.rnn import pad_sequence
+import abc
+class Word(abc):
     '''
     We assume the sample space can be abstract into sentences composed of words. Then for word of cardinality k, sentence max length n
     the total number of sample is k^n
@@ -10,13 +12,21 @@ class Word(ABC):
     given current collection of samples
     '''
     def __init__(self,args,  raw_data,elements):
-        self.element_to_index = { element: index for index, element in enumerate(elements)}
-        self.vocabulary = self.build_vocabulary(raw_data, embedding_dim , elements=None)
+        elements = list(set(elements))
+        if elements is not None:
+            #need to make sure element is a set instead of a list
+            if 'end'not in elements:
+                elements[0] ='end'
+            self.vocabulary = { element: index for index, element in enumerate(elements)}
+        else:
+            self.vocabulary = self.build_vocabulary(raw_data, embedding_dim , elements=None)
+        self.embedding = nn.Embedding(len(elements),embedding_dim)
         self.proxy_reward = proxy_reward(args.proxy_reward)
-        self._data = self.rawData_to_samples(args.format, raw_data)
         #  self.env_structure = self.Word_to_Structure
 
 
+    def tokenizer(self, sentence, vocab):
+        return [vocab[word] for word in sentence.split() if word in vocab]
 
     def build_vocabulary(self,raw_data, embedding_dim,elements):
         '''
@@ -30,11 +40,13 @@ class Word(ABC):
         # Let's assume structured format is a dictionary of word frequencies
         if not elements:
             #extract all elements from the raw_data
-            elements = somefunction(raw_data)
+        #    elements = somefunction(raw_data)
             raise Exception('The elements should be extracted from raw_data')
-
-        embedding = nn.Embedding(len(elements),embedding_dim)
         return embedding
+
+    def embed(self,tokenized_sentence_tensors):
+        padded = pad_sequence(tokenized_sentence_tensors, batch_first=True, padding_value=0)
+        return self.embedding(padded)
 
     def rawData_to_samples(self, raw_data,format='unordered'):
         '''
@@ -46,12 +58,12 @@ class Word(ABC):
         '''
         if format =='unordered':
             # parallel computing to convert raw data to string representation with numpy
-            idx = vocab[raw_data]
-            idx_tensor = torch.tensor([idx])
-            samples = self.vocabulary(idx_tensor)
+            tokenized_sentences = [ tokenize(sentence,self.vocabulary) for sentence in raw_data]
+            tokenized_sentences_tensors = [torch.tensor(tokens) for tokens in tokenized_sentences]
+            samples = tokenized_sentences_tensors
             #use proxy reward function to label each sample and put them into trie data structures
             rewards = self.proxy_reward(raw_data)
 
-        return (samples,rewards)
+        return {'object':samples,'rewards':rewards}
 
 
