@@ -1,10 +1,9 @@
 import pandas as pd
-import utils.proxy_reward as proxy_reward
-from utils.data_structures import samples
+import src.utils.proxy_reward as proxy_reward
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence
-import abc
-class Word(abc):
+from abc import ABC
+class Word(ABC):
     '''
     We assume the sample space can be abstract into sentences composed of words. Then for word of cardinality k, sentence max length n
     the total number of sample is k^n

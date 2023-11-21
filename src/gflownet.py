@@ -1,7 +1,8 @@
-from transformer import transformer
-from .utils.data_structures import Trie, Trie_node
-from preprocessors import Word
+# from transformer import transformer
+from src.preprocessors import Word
+from src.utils import Trie, Trie_node
 import random
+from abc import ABC
 
 
 class Gflow_node(Trie_node):
@@ -73,7 +74,7 @@ class Gflow_Trie(Trie):
             pCrawl = pCrawl.children[index]
         return pCrawl.flow
 
-class Gflow_extrapolate():
+class Gflow_extrapolate(ABC):
     def __init__(self,args,word,raw_data):
         '''
         Mainly contains two orgain: 1. data structure to hold all the structured edge flows 2. Transformer that can utilize the edge flows to extrapolate
@@ -107,7 +108,7 @@ class Gflow_extrapolate():
         for s in self.samples:
             Gflow_Trie.insert(s)
         return Gflow_Trie
-    def backward_reward_propagation(self, cursor = self.samples_structure.get_root(), propogate_rule='min_entropy'):
+    def backward_reward_propagation(self, cursor = None, propogate_rule='min_entropy'):
         '''
         We use dynamic programming to get an estimate of edge flows between states
         Notice edge flows can be recursively decomposed into sub-edge flows.

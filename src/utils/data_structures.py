@@ -1,7 +1,5 @@
-import jax.numpy as jnp
 from abc import ABC, abstractmethod
-import ast
-import marisa_trie
+
 import networkx as nx
 #
 #
@@ -138,8 +136,4 @@ class Trie:
     #     nx.draw_networkx_edge_labels(self.graph, pos, edge_labels={(u, v): self.graph[u][v]['label'] for u, v in self.graph.edges()})
     #     nx.draw_networkx_labels(self.graph, pos)
 
-trie = Trie()
-trie.insert("hello", weight=2)
-trie.insert("hell", weight=3)
-trie.insert("help", weight=1)
-trie.visualize()
+
