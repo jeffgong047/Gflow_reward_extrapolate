@@ -14,8 +14,10 @@ def main(args):
     word = Word(args,evidences)
     annotated_samples = word.rawData_to_samples(args.scorer)
     Gflownet = Gflow_extrapolate(args,word,annotated_samples)
-
-
+    root = Gflownet.get_root()
+    Gflownet.backward_reward_propagation(root)
+    states_flows = Gflownet.get_states_flows()
+    print(states_flows)
 
 
 

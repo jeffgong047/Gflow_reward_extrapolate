@@ -64,7 +64,6 @@ class Gflow_Trie(Trie):
         state = [source,target]
         return self.get_state_flow(state)
 
-
     def get_state_flow(self, state):
         key = state
         pCrawl = self.root
@@ -75,6 +74,20 @@ class Gflow_Trie(Trie):
                 raise Exception('The edge does not exist in Gflownet sample structure')
             pCrawl = pCrawl.children[index]
         return pCrawl.flow
+
+    def get_All_states_flow(self):
+        flows = []
+        queue = []
+        queue.append(self.root)
+        while(queue):
+            node = queue.pop()
+            flows.append(node.flow)
+            for child in node.children:
+                if child:
+                    queue.append(child)
+        return flows
+
+
 
 class Gflow_extrapolate(ABC):
     def __init__(self,args,word,annotated_samples):
@@ -96,6 +109,13 @@ class Gflow_extrapolate(ABC):
         self.word = word
         self.samples = annotated_samples
         self.samples_structure = self.build_samples_structures()
+
+    def get_root(self):
+        return self.samples_structure.root
+
+    def get_states_flows(self):
+        return self.samples_structure.get_All_states_flow()
+
 
     def predict_edge_flow(self,source_state, target_state):
         indexes = self.word.vocabulary([source_state,target_state])
