@@ -10,6 +10,8 @@ import networkx as nx
 from collections import namedtuple
 from abc import ABC, abstractmethod
 from copy import deepcopy
+from pgmpy.metrics import structure_score
+from pgmpy.base import DAG
 LocalScore = namedtuple('LocalScore', ['key', 'score', 'prior'])
 
 
@@ -328,29 +330,34 @@ def get_prior(name, **kwargs):
 
 
 
+class BDeu(ABC):
+    def __init__(self,sample,evidence_data):
+        self._evidence_data = evidence_data
+        self._sample = sample
+
+    def estimate(self, elements, sample, evidence_data):
+        model = DAG()
+        model.add_nodes_from(elements)
+        model.add_edges_from(sample)
+        if model.edges():
+            score = structure_score(model, evidence_data, scoring_method="bdeu")
+        else:
+            score= 0
+        return score
+
+
 class proxy_reward_function(ABC):
 
     def __init__(self,scorer_name, data, **kwargs):
         self.scorer_collection = {'BDeu':BDeScore}
         self.data = data
-        self.scorer = self.scorer_collection[scorer_name](data,**kwargs)
+        self.scorer = self.scorer_collection[scorer_name](elements,**kwargs)
+
     def annotate(self,samples):
         rewards = []
         for s in samples:
-            score = self.scorer.get_sample_score(s)
+            score = self.scorer.estimate(s, **kwargs)
             rewards.append(score)
         return rewards
-def main():
-    #load data
-    filename = './data_results/data/real_data/demo2.csv'
-    data = pd.read_csv(filename, delimiter=',', dtype='category')
-    edges = [('A','B'),('C','B')]
-    #edges = [('B','C')]
-    graph = nx.DiGraph(edges)
-    prior = get_prior('uniform')
-    bde_scorer = BDeScore(data,prior)
-    bde_score = bde_scorer.get_sample_score(graph)
-    print('bde score is: ',bde_score)
 
-if __name__ == "__main__":
-    main()
+

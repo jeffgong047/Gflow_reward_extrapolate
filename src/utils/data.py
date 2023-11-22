@@ -1,32 +1,46 @@
-import proxy_reward
+import itertools
+import matplotlib.pyplot as plt
+import numpy as np
+import pickle
+import pandas as pd
+from pgmpy.metrics import structure_score
+from pgmpy.base import DAG
+
 
 
 def get_data(args):
+    name = args.objects
     if name =="demo":
         edges = [('A', 'B'), ('C', 'B'), ('C', 'D')]
-        graph =  nx.DiGraph(edges)
         filename ='data/demo.csv'
-        data = pd.read_csv(filename, delimiter=',', dtype='category')
-        proxy_reward = proxy_reward.bdeu_score
-        score ='bde'
+        evidence_data = pd.read_csv(filename, delimiter=',', dtype='category')
+        score ='Bdeu'
     elif name =="demo1":
         edges = [('A','B'),('B','C')]
         graph = nx.DiGraph(edges)
         filename ='data/demo1.csv'
-        data = pd.read_csv(filename, delimiter=',', dtype='category')
-        proxy_reward = proxy_reward.bdeu_score
-        score ='bde'
+        evidence_data = pd.read_csv(filename, delimiter=',', dtype='category')
+        score ='BDeu'
     elif name == "demo2":
-        edges = [('A','B'),('C','B')]
-        graph = nx.DiGraph(edges)
-        filename ='data/demo2.csv'
-        data = pd.read_csv(filename, delimiter=',', dtype='category')
-        proxy_reward = proxy_reward.bdeu_score
-        score ='bde'
+        score = 'BDeu'
+        evidence_data = pd.read_csv('/common/home/hg343/Research/Gflow_reward_extrapolate/data/demo2.csv')
+        nodes = ['A','B','C']
+        elements = []
+        for u_i,u in enumerate(nodes):
+            for v_i, v in enumerate(nodes):
+                if u_i!=v_i:
+                    elements.append(u+v)
+        full_samples =list(itertools.chain.from_iterable([itertools.combinations(elements,i+1) for i in range(len(elements))]))
     elif name =="demo3":
         edges = [('B','A'),('B','C')]
         graph = nx.DiGraph(edges)
         filename ='data/demo3.csv'
-        data = pd.read_csv(filename, delimiter=',', dtype='category')
-        proxy_reward = proxy_reward.bdeu_score
-        score ='bde'
+        evidence_data = pd.read_csv(filename, delimiter=',', dtype='category')
+        score ='BDeu'
+    elif name =='demo4':
+        edges = [('A', 'B'), ('C', 'B'), ('C', 'D'),('E','C'),('C','A')]
+        graph = BayesianNetwork(edges)
+        filename = args.data_path
+        evidence_data = pd.read_csv(filename, delimiter=',', dtype='category')
+        score = 'BDeu'
+    return score,evidence_data ,elements,full_samples

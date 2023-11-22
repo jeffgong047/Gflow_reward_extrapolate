@@ -6,14 +6,12 @@ import json
 from src.gflownet import Gflow_extrapolate
 from src.preprocessors import Word
 import pandas as pd
-
-
-def data_loader(path, **kwargs):
-    return pd.read_csv(path)
+from src.utils.data import get_data
 
 def main(args):
-    evidence_data = data_loader(args.data_path)
-    word = Word(args,evidence_data,elements)
+    scorer,evidence_data ,elements,samples = get_data(args)
+    args.scorer = scorer
+    word = Word(args,evidence_data,elements,samples)
     a = Gflow_extrapolate(args,word, evidence_data)
 
 
@@ -29,8 +27,8 @@ if __name__ == '__main__':
     environment = parser.add_argument_group('Environment')
     environment.add_argument('--num_envs', type=int, default=8,
                              help='Number of parallel environments (default: %(default)s)')
-    environment.add_argument('--scorer_kwargs', type=json.loads, default='{}',
-                             help='Arguments of the scorer.')
+    environment.add_argument('--scorer', type=str, default='',
+                             help='name of the scorer.')
     environment.add_argument('--prior', type=str, default='uniform',
                              choices=['uniform', 'erdos_renyi', 'edge', 'fair'],
                              help='Prior over graphs (default: %(default)s)')
@@ -65,7 +63,7 @@ if __name__ == '__main__':
 
     # Miscellaneous
     misc = parser.add_argument_group('Miscellaneous')
-    misc.add_argument('--data_path',type = str,default='',help = 'path to store the evidence data')
+    misc.add_argument('--objects',type = str,default='demo2',help = 'name of the object to perform generative modeling')
     misc.add_argument('--num_samples_posterior', type=int, default=1000,
                       help='Number of samples for the posterior estimate (default: %(default)s)')
     misc.add_argument('--update_target_every', type=int, default=1000,
