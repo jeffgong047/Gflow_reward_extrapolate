@@ -4,7 +4,6 @@ import pandas as pd
 
 from scipy.special import gammaln
 from collections import namedtuple
-
 import sys
 import networkx as nx
 from collections import namedtuple
@@ -183,7 +182,7 @@ class BasePrior(ABC):
 StateCounts = namedtuple('StateCounts', ['key', 'counts'])
 
 
-class BDeScore(BaseScore):
+class BDeScore_gflow(BaseScore):
     """BDe score.
 
     Parameters
@@ -331,14 +330,16 @@ def get_prior(name, **kwargs):
 
 
 class BDeu(ABC):
-    def __init__(self,sample,evidence_data):
-        self._evidence_data = evidence_data
-        self._sample = sample
-
-    def estimate(self, elements, sample, evidence_data):
+    def __init__(self,evidences):
+        self.evidences = evidences
+    def estimate(self,  sample):
+        evidences = self.evidences
+        nodes = evidences['nodes']
+        evidence_data = evidences['evidence_data']
         model = DAG()
-        model.add_nodes_from(elements)
-        model.add_edges_from(sample)
+        model.add_nodes_from(nodes = nodes)
+        edges = [(element[0],element[1]) for element in sample]
+        model.add_edges_from(edges)
         if model.edges():
             score = structure_score(model, evidence_data, scoring_method="bdeu")
         else:
@@ -347,16 +348,15 @@ class BDeu(ABC):
 
 
 class proxy_reward_function(ABC):
-
-    def __init__(self,scorer_name, data, **kwargs):
-        self.scorer_collection = {'BDeu':BDeScore}
-        self.data = data
-        self.scorer = self.scorer_collection[scorer_name](elements,**kwargs)
+    def __init__(self,scorer_name, evidences):
+        self.scorer_collection = {'BDeu':BDeu}
+        self.evidences = evidences
+        self.scorer = self.scorer_collection[scorer_name](evidences)
 
     def annotate(self,samples):
         rewards = []
         for s in samples:
-            score = self.scorer.estimate(s, **kwargs)
+            score = self.scorer.estimate(s)
             rewards.append(score)
         return rewards
 

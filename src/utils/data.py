@@ -31,6 +31,7 @@ def get_data(args):
                 if u_i!=v_i:
                     elements.append(u+v)
         full_samples =list(itertools.chain.from_iterable([itertools.combinations(elements,i+1) for i in range(len(elements))]))
+        evidences = {'evidence_data':evidence_data,'elements':elements,'full_samples':full_samples,'nodes':nodes}
     elif name =="demo3":
         edges = [('B','A'),('B','C')]
         graph = nx.DiGraph(edges)
@@ -43,4 +44,5 @@ def get_data(args):
         filename = args.data_path
         evidence_data = pd.read_csv(filename, delimiter=',', dtype='category')
         score = 'BDeu'
-    return score,evidence_data ,elements,full_samples
+
+    return score,evidences

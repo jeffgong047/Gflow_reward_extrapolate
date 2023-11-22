@@ -9,10 +9,11 @@ import pandas as pd
 from src.utils.data import get_data
 
 def main(args):
-    scorer,evidence_data ,elements,samples = get_data(args)
+    scorer,evidences = get_data(args)
     args.scorer = scorer
-    word = Word(args,evidence_data,elements,samples)
-    a = Gflow_extrapolate(args,word, evidence_data)
+    word = Word(args,evidences)
+    annotated_samples = word.rawData_to_samples(args.scorer)
+    Gflownet = Gflow_extrapolate(args,word,annotated_samples)
 
 
 
@@ -53,6 +54,10 @@ if __name__ == '__main__':
     replay.add_argument('--prefill', type=int, default=1000,
                         help='Number of iterations with a random policy to prefill '
                              'the replay buffer (default: %(default)s)')
+
+    #Neural Network
+    neural_network = parser.add_argument_group('Neural Network')
+    neural_network.add_argument('--embedding_dim', type= int, default=256, help='word embedding dimension')
 
     # Exploration
     exploration = parser.add_argument_group('Exploration')
