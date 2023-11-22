@@ -7,27 +7,29 @@ from abc import ABC
 
 class Gflow_node(Trie_node):
     def __init__(self,vocab_size):
-        super.__init__(vocab_size)
+        super().__init__(vocab_size)
         self.flow = None
 
 class Gflow_Trie(Trie):
-    def __init__(self,vocab):
-        self.root = super.__init__()
-        self.vocab = vocab
+    def __init__(self,vocab_size):
+        # self.vocab = vocab
+        self.vocab_size = vocab_size
+        self.root = self.getNode()
+
 
     def getNode(self):
-        return Gflow_node()
+        return Gflow_node(self.vocab_size)
 
-    def _charToIndex(self,ch):
-
-        # private helper function
-        # Converts key current character into index
-        # use only 'a' through 'z' and lower case
-        if ch in self.vocab:
-            index = self.vocab[ch]
-        else:
-            raise Exception('The word is not in the vocabulary')
-        return index
+    # def _charToIndex(self,ch):
+    #
+    #     # private helper function
+    #     # Converts key current character into index
+    #     # use only 'a' through 'z' and lower case
+    #     if ch in self.vocab:
+    #         index = self.vocab[ch]
+    #     else:
+    #         raise Exception('The word is not in the vocabulary')
+    #     return index
 
     def get_children(self,node):
         return node.children
@@ -41,22 +43,22 @@ class Gflow_Trie(Trie):
         :param sample:
         :return:
         '''
-        key = sample['object']
-        reward = sample['reward']
+        key = sample[0]
+        reward = sample[1]
         # If not present, inserts key into trie
         # If the key is prefix of trie node,
         # just marks leaf node
         pCrawl = self.root
         length = len(key)
         for level in range(length):
-            index = self._charToIndex(key[level])
+            index = key[level]
             # if current character is not present
             if not pCrawl.children[index]:
                 pCrawl.children[index] = self.getNode()
             pCrawl = pCrawl.children[index]
         # mark last node as leaf
         pCrawl.isEndOfWord = True
-        pCraw.flow = reward
+        pCrawl.flow = reward
 
     def get_edge_flow(self,source,target):
         state = [source,target]
@@ -68,14 +70,14 @@ class Gflow_Trie(Trie):
         pCrawl = self.root
         length = len(key)
         for level in range(length):
-            index = self._charToIndex(key[level])
+            index = key[level]
             if not pCrawl.children[index]:
                 raise Exception('The edge does not exist in Gflownet sample structure')
             pCrawl = pCrawl.children[index]
         return pCrawl.flow
 
 class Gflow_extrapolate(ABC):
-    def __init__(self,args,word,raw_data):
+    def __init__(self,args,word,annotated_samples):
         '''
         Mainly contains two orgain: 1. data structure to hold all the structured edge flows 2. Transformer that can utilize the edge flows to extrapolate
         Algorithms to calculate edge flows and train the transformer to fit the flows
@@ -92,11 +94,8 @@ class Gflow_extrapolate(ABC):
         Need to decide whether use backward_propagation for edge flows or state flows. We can store states in a trie
         '''
         self.word = word
-        self.edge_flows_dict = {combinations_choose2(vocabulary):None}
-        self.states_flows_dict = {combinations(vocabulary):None}
-        self.samples = self.word.rawData_to_samples(raw_data,args.format)
+        self.samples = annotated_samples
         self.samples_structure = self.build_samples_structures()
-        self.transformer = transformer
 
     def predict_edge_flow(self,source_state, target_state):
         indexes = self.word.vocabulary([source_state,target_state])
@@ -104,10 +103,10 @@ class Gflow_extrapolate(ABC):
         return self.transformer(embedding)
 
     def build_samples_structures(self):
-        Gflow_Trie = Gflow_Trie(self.samples['object'])
-        for s in self.samples:
-            Gflow_Trie.insert(s)
-        return Gflow_Trie
+        gflow_trie = Gflow_Trie(len(self.word.vocabulary))
+        for s in zip(self.samples['object'],self.samples['rewards']):
+            gflow_trie.insert(s)
+        return gflow_trie
     def backward_reward_propagation(self, cursor = None, propogate_rule='min_entropy'):
         '''
         We use dynamic programming to get an estimate of edge flows between states

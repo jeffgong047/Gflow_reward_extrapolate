@@ -61,10 +61,8 @@ class Word(ABC):
         if format =='unordered':
             # parallel computing to convert raw data to string representation with numpy
             tokenized_sentences = [ self.tokenizer(sentence,self.vocabulary) for sentence in self.raw_samples]
-            tokenized_sentences_tensors = [torch.tensor(tokens) for tokens in tokenized_sentences]
+            tokenized_sentences_tensors = [tokens for tokens in tokenized_sentences]
             samples = tokenized_sentences_tensors
             #use proxy reward function to label each sample and put them into trie data structures
             rewards = self.proxy_reward.annotate(self.raw_samples)
         return {'object':samples,'rewards':rewards}
-
-
