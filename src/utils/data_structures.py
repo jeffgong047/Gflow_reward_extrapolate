@@ -31,13 +31,18 @@ import networkx as nx
 class Trie_node():
     def __init__(self,vocab_size):
         assert isinstance(vocab_size,int)
-        self.children = [None ]*vocab_size
+        self._children = [None ]*vocab_size
         self.end_of_Sentence = False
-    def get_child(self):
-        return self.child
+    @property
+    def children(self):
+        return self._children
 
-    def add_child(self,element):
-        self.child.append(element)
+
+    def all_children(self):
+        return np.arange(vocab_size)
+    def add_child(self,index, node):
+        ## TO DO: need to add element at its corresponding index
+        self._children[index] = node
 
 
 

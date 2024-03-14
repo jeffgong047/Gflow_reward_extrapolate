@@ -4,6 +4,7 @@ import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence
 from abc import ABC
 import torch
+import numpy as np
 class Word(ABC):
     '''
     We assume the sample space can be abstract into sentences composed of words. Then for word of cardinality k, sentence max length n
@@ -11,19 +12,20 @@ class Word(ABC):
     This assumption about the sample gives us a structure between samples, and this class aims to recover the state of sample_structure
     given current collection of samples
     '''
-    def __init__(self,args, evidences):
+    def __init__(self,args, evidences=None):
         self.evidences = evidences
-        self.raw_samples = evidences['full_samples']
-        self.evidence_data = evidences['evidence_data']
-        elements = evidences['elements']
-        if elements is not None:
-            if 'end' not in elements:
-                self.elements=['end',*elements]
-            self.vocabulary = { element: index for index, element in enumerate(elements)}
+        if evidences['full_samples']:
+            self.raw_samples = [list(s) for s in evidences['full_samples']]
+            self.evidence_data = evidences['evidence_data']
+            self.proxy_reward = proxy_reward_function(args.scorer, evidences)
+        self.elements = evidences['elements']
+        if self.elements is not None:
+            self.vocabulary = { element: index for index, element in enumerate(self.elements)}
+            self.vocabulary.update({'end':-1})
         else:
             self.vocabulary = self.build_vocabulary(raw_data, embedding_dim , elements=None)
-        self.embedding = nn.Embedding(len(elements),args.embedding_dim)
-        self.proxy_reward = proxy_reward_function(args.scorer, evidences)
+        self.embedding = nn.Embedding(len(self.elements),args.embedding_dim)
+
         #  self.env_structure = self.Word_to_Structure
 
 
@@ -50,6 +52,15 @@ class Word(ABC):
         padded = pad_sequence(tokenized_sentence_tensors, batch_first=True, padding_value=0)
         return self.embedding(padded)
 
+    def pad(self,sentences):
+        max_length = len(self.vocabulary)
+        sentences[0] = sentences[0] + (max_length-len(sentences[0]))*[0]
+        if not isinstance(sentences,torch.Tensor):
+            tensor_sentences = [torch.tensor(s) for s in sentences]
+            padded_sentences = pad_sequence(tensor_sentences, batch_first=True)
+        # how to parallel pad all the samples to max_length
+        return padded_sentences
+
     def rawData_to_samples(self,scorer_name,format='unordered'):
         '''
         Convert the raw data to standard sample format.
@@ -60,9 +71,12 @@ class Word(ABC):
         '''
         if format =='unordered':
             # parallel computing to convert raw data to string representation with numpy
+            #pad end symbol to all raw_samples
             tokenized_sentences = [ self.tokenizer(sentence,self.vocabulary) for sentence in self.raw_samples]
-            tokenized_sentences_tensors = [tokens for tokens in tokenized_sentences]
+            append_end_tokenized_sentences = [s +[-1] for s in tokenized_sentences]
+            tokenized_sentences_tensors = [tokens for tokens in append_end_tokenized_sentences]
             samples = tokenized_sentences_tensors
             #use proxy reward function to label each sample and put them into trie data structures
             rewards = self.proxy_reward.annotate(self.raw_samples)
+            print('rawData to samples: ',samples)
         return {'object':samples,'rewards':rewards}
