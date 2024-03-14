@@ -24,7 +24,7 @@ class Gflow_node(Trie_node):
         self.flow = None
         self.attempts = 0
         self.parent = parent
-        self.curiosity_budget = None
+        self.curiosity_budget = 0
 class Gflow_Trie(Trie):
     def __init__(self,vocab_size):
         # self.vocab = vocab
@@ -39,6 +39,16 @@ class Gflow_Trie(Trie):
     @num_sentences.setter
     def num_sentences(self, value):
         self._num_sentences = value
+
+    def get_state(self,state_representation):
+        print(state_representation)
+        cursor = self.root
+        for i in state_representation:
+            if cursor is None:
+                cursor.children[i] = self.getNode(cursor)
+            cursor = cursor.children[i]
+            assert cursor.end_of_Sentence == True
+        return cursor
 
     def get_sentence(self, state):
         '''
@@ -100,7 +110,6 @@ class Gflow_Trie(Trie):
         :param sample:
         :return:
         '''
-        breakpoint()
         key = sample[0]
         reward = sample[1]
         self.num_sentences += 1
@@ -117,10 +126,10 @@ class Gflow_Trie(Trie):
                 pCrawl.add_child(index, self.getNode(parent=pCrawl))
             pCrawl = pCrawl.children[index]
             pCrawl.attempts +=1
-            if index==-1: # handle padding in a lazzy way
+            if index==-1: # handle padding in a lazy way
                 break
         # mark last node as leaf
-        pCrawl.isEndOfWord = True
+        pCrawl.end_of_Sentence = True  #pCrawl is after taking the end action
         try:
             assert index == -1
         except:
@@ -266,6 +275,7 @@ class Gflow_extrapolate(GFlowNet):
         :param sample:
         :return:
         '''
+        breakpoint()
         for s in samples:
             self.samples_structure.insert(s)
             self.sample_wise_backward_reward_propagation(s)
@@ -431,7 +441,6 @@ class Gflow_extrapolate(GFlowNet):
         #Make this dynamic programming and states based.
         '''
         if cursor.end_of_Sentence:
-            breakpoint()
             if current_node.flows == None:
                 raise Exception('The sample is incomplete because it has no reward')
             return current_node.flows

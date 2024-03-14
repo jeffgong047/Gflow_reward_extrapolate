@@ -86,10 +86,10 @@ def main(args):
     selected_samples_rewards = env.log_reward(final_states = selected_samples_states)
     annotated_selected_samples = {'object':selected_samples, 'rewards': selected_samples_rewards}
     Gflownet_active_learning_hypergrid = Gflow_extrapolate(args, word, annotated_selected_samples) # the selected samples are pre-learnt
-    Gflownet_active_learning_hypergrid.backward_reward_propagation() # if the initialization is with samples, backward propagation is required
+    Gflownet_active_learning_hypergrid.backward_reward_propagation(Gflownet_active_learning_hypergrid.get_root()) # if the initialization is with samples, backward propagation is required
     trajectories = Gflownet_active_learning_hypergrid.sample_trajectories(n_samples = 10, env= env)
     breakpoint()
-    Gflownet_active_learning_hypergrid.insert(trajectories)
+    Gflownet_active_learning_hypergrid.dynamic_insert(trajectories)
     Gflownet_active_learning_hypergrid.backward_reward_propagation(Gflownet_active_learning.get_root())
     Gflownet_active_learning_hypergrid.get_states_flows()
     #2)try branching

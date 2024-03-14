@@ -3,7 +3,7 @@ from gfn.states import States
 from gfn.env import Env
 import numpy as np
 from src.utils import translator
-
+import torch
 trans = translator()
 
 class States_triv(States):
@@ -41,8 +41,9 @@ class extrapolate_Policy(Sampler):
                 states.
         """
         dist = self.exploration_strategy(state, env)
-        action = np.random.multinomial(1, dist)
-        return action
+        action = np.random.multinomial(1, dist.cpu().numpy())
+        action_index = np.argmax(action)
+        return action_index
 
 
     def exploration_strategy(self,state ,env):
@@ -73,8 +74,7 @@ class extrapolate_Policy(Sampler):
                 #Notice if we have curiosity budget, the average flow of visited states is larger than non-visited states
                 state_flows.append(flow)
         z = sum(state_flows) + state_reward
-        prob = state_flows/z
-
+        prob = torch.tensor(state_flows).cuda()/z
         #we need to define curiosity for each state
         return prob
 
@@ -89,6 +89,9 @@ class extrapolate_Policy(Sampler):
             n_trajectories,
     ):
         '''
+        The sampled trajectories should represent the intelligence of the gflownet
+        1. If no such knowledge exists in the sampler, sampler trajectory function rely on its exploration strategy
+        2. The sampled trajectory can dynamically update parameters of the sampler in return to improve the exploration policy
         :param env:
         :param off_policy:
         :param states:
@@ -101,9 +104,19 @@ class extrapolate_Policy(Sampler):
             state = states[i]
             while(True):
                 action = self.sample_actions(env,state)
-                state = env.step(action) # need to specify how to communicate with environment
-                if state:
-                    trajectory.append(state)
+                print('original state is: ', state)
+                print('action being taken is: ', action)
+                trajectory.append(action)
+                state_representation = env.step_trie(self.memory.get_sentence(state), action) # need to specify how to communicate with environment
+                if state_representation:
+                    state = self.memory.get_state(state_representation)
+                    if state.children[action] is None:
+                        state.children[action] = self.memory.getNode(parent=state) #we could update curiosity budget here
+                    state = state.children[action]
+                    if action ==-1 :
+                        state.end_of_Sentence = True
+                    print('new state is: ', state)
+                    print('current trajectory is: ', trajectory)
                 else:
                     break
             trajectories.append(trajectory)
