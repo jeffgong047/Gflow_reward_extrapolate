@@ -40,9 +40,15 @@ class extrapolate_Policy(Sampler):
                 the sampled actions under the probability distribution of the given
                 states.
         """
-        dist = self.exploration_strategy(state, env)
-        action = np.random.multinomial(1, dist.cpu().numpy())
-        action_index = np.argmax(action)
+        try:
+            dist = self.exploration_strategy(state, env)
+            action = np.random.multinomial(1, dist.cpu().numpy())
+            action_index = np.argmax(action)
+        except:
+            breakpoint()
+            a=1
+            b=2
+            c=a+b
         return action_index
 
 
@@ -62,7 +68,9 @@ class extrapolate_Policy(Sampler):
             average_flow = state.flow/len(list(filter(lambda x:x is not None, state_children)))
         else:
             average_flow = 1
-            assert state.children == None
+            assert all(c is None for c in state.children)
+
+
         state_flows = []
         for child in state_children:
             if child:
@@ -73,6 +81,7 @@ class extrapolate_Policy(Sampler):
                 # are we also considering curiosity budget of visited states(how to effectively scale w.r.t to time and childrens).
                 #Notice if we have curiosity budget, the average flow of visited states is larger than non-visited states
                 state_flows.append(flow)
+        state_flows.append(state_reward)
         z = sum(state_flows) + state_reward
         prob = torch.tensor(state_flows).cuda()/z
         #we need to define curiosity for each state
@@ -107,9 +116,9 @@ class extrapolate_Policy(Sampler):
                 print('original state is: ', state)
                 print('action being taken is: ', action)
                 trajectory.append(action)
-                state_representation = env.step_trie(self.memory.get_sentence(state), action) # need to specify how to communicate with environment
-                if state_representation:
-                    state = self.memory.get_state(state_representation)
+                actions = env.step_trie(self.memory.get_sentence(state), action) # need to specify how to communicate with environment
+                if actions:
+                    state = self.memory.get_state(actions[:-1])
                     if state.children[action] is None:
                         state.children[action] = self.memory.getNode(parent=state) #we could update curiosity budget here
                     state = state.children[action]

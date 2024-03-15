@@ -47,7 +47,13 @@ class Gflow_Trie(Trie):
             if cursor is None:
                 cursor.children[i] = self.getNode(cursor)
             cursor = cursor.children[i]
-            assert cursor.end_of_Sentence == True
+            try:
+                assert (cursor.end_of_Sentence) == (cursor.parent.children[-1] is cursor)
+            except:
+                breakpoint()
+                a=1
+                b=2
+                c=a+b
         return cursor
 
     def get_sentence(self, state):
@@ -61,7 +67,7 @@ class Gflow_Trie(Trie):
         child = state
         while parent is not None:
             action = None
-            for index, element in parent.children:
+            for index, element in enumerate(parent.children):
                 if element == child:
                     action = index
             assert action is not None
