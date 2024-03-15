@@ -4,6 +4,7 @@ from gfn.env import Env
 import numpy as np
 from src.utils import translator
 import torch
+import torch.nn.functional as F
 trans = translator()
 
 class States_triv(States):
@@ -41,15 +42,15 @@ class extrapolate_Policy(Sampler):
                 states.
         """
         try:
-            dist = self.exploration_strategy(state, env)
+            dist = F.softmax(self.exploration_strategy(state, env),dim=0)
             action = np.random.multinomial(1, dist.cpu().numpy())
             action_index = np.argmax(action)
+            return action_index
         except:
             breakpoint()
             a=1
             b=2
             c=a+b
-        return action_index
 
 
     def exploration_strategy(self,state ,env):
@@ -72,20 +73,21 @@ class extrapolate_Policy(Sampler):
 
 
         state_flows = []
-        for child in state_children:
+        for child in state_children[:-1]:
             if child:
                 state_flows.append(child.flow + child.curiosity_budget)
             else:
-                flow = average_flow
+                flow = state_reward
                 # the problem is if a state is not visited, how could it have curiosity budget?
                 # are we also considering curiosity budget of visited states(how to effectively scale w.r.t to time and childrens).
                 #Notice if we have curiosity budget, the average flow of visited states is larger than non-visited states
                 state_flows.append(flow)
         state_flows.append(state_reward)
         z = sum(state_flows) + state_reward
-        prob = torch.tensor(state_flows).cuda()/z
+        print('state flows are: ', torch.tensor(state_flows), 'normalizing constatnt is: ', z)
+        logits = torch.tensor(state_flows).cuda()/abs(z)
         #we need to define curiosity for each state
-        return prob
+        return logits
 
 
 
