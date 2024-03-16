@@ -41,16 +41,14 @@ class extrapolate_Policy(Sampler):
                 the sampled actions under the probability distribution of the given
                 states.
         """
-        try:
-            dist = F.softmax(self.exploration_strategy(state, env),dim=0)
-            action = np.random.multinomial(1, dist.cpu().numpy())
-            action_index = np.argmax(action)
-            return action_index
-        except:
-            breakpoint()
-            a=1
-            b=2
-            c=a+b
+
+        dist = F.softmax(self.exploration_strategy(state, env),dim=0)
+        print('distribution is: ', dist)
+        action = np.random.multinomial(1, dist.cpu().numpy())
+        action_index = np.argmax(action)
+        action_index = -1  if action_index +1 == len(dist) else action_index
+        print('selected action is: ', action_index)
+        return action_index
 
 
     def exploration_strategy(self,state ,env):
@@ -69,7 +67,7 @@ class extrapolate_Policy(Sampler):
             average_flow = state.flow/len(list(filter(lambda x:x is not None, state_children)))
         else:
             average_flow = 1
-            assert all(c is None for c in state.children)
+            # assert all(c is None for c in state.children) # exploration beyond state of zero flow is allowed, and without backward reward propagation, flow=0 can not indicates children existence
 
 
         state_flows = []
@@ -129,6 +127,7 @@ class extrapolate_Policy(Sampler):
                     print('new state is: ', state)
                     print('current trajectory is: ', trajectory)
                 else:
+                    print('stop current trajectory ...', trajectory)
                     break
             trajectories.append(trajectory)
         return trajectories

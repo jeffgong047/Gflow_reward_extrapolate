@@ -21,7 +21,7 @@ from gfn.env import Env
 class Gflow_node(Trie_node):
     def __init__(self,vocab_size,parent= None):
         super().__init__(vocab_size)
-        self.flow = None
+        self.flow = 0
         self.attempts = 0
         self.parent = parent
         self.curiosity_budget = 0
@@ -282,9 +282,9 @@ class Gflow_extrapolate(GFlowNet):
         :return:
         '''
         breakpoint()
-        for s in samples:
+        for s in zip(samples['object'],samples['rewards']):
             self.samples_structure.insert(s)
-            self.sample_wise_backward_reward_propagation(s)
+            self.sample_wise_backward_reward_propagation(state = s, flows = s.flow, path = self.samples_structure.get_sentence(s))
 
     # Define some GFlowNet methods required by torchgfn
     def sample_trajectories(
@@ -451,7 +451,7 @@ class Gflow_extrapolate(GFlowNet):
                 raise Exception('The sample is incomplete because it has no reward')
             return current_node.flows
         else:
-            assert cursor.flow ==None
+            # assert cursor.flow ==None
             childrens = self.samples_structure.get_children(cursor)
             flow = 0
             for index, child in enumerate(childrens):

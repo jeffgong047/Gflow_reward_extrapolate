@@ -2,9 +2,12 @@ from abc import ABC
 from gfn.states import States
 from gfn.actions import Actions
 import torch
+from torch.nn.utils.rnn import pad_sequence
 class States_triv(States):
     def __init__(self,tensor):
         self.tensor = tensor
+
+
 
 
 class translator(ABC):
@@ -29,8 +32,14 @@ class translator(ABC):
                 return env.States(env.s0)
             # if data[-1] == gflow_plus_plus.vocabulary['end']: #Probably need to consider end case later
             #     return env.sf
-            data = torch.tensor(data)
-            return States_triv(data)
+            if isinstance(data[0], list):
+                batch_data = [torch.tensor(d) for d in data]
+                padded_batch = pad_sequence(batch_data, batch_first = True)
+                padded_batch[padded_batch == 0 ] = -1
+                tensor_data = padded_batch
+            else:
+                tensor_data = torch.tensor(data)
+            return States_triv(tensor_data)
 
 
 
