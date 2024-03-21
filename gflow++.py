@@ -48,29 +48,29 @@ def visualize_prediction_accuracy(predictions, targets):
 
 def main(args):
     #basic test on signaling pathway dataset
-    # scorer,evidences = get_data(args)
-    # args.scorer = scorer
-    # word = Word(args,evidences)
-    # #1)sample some flows and use backward decomposition to reconstruct the flows and check all flows reproduced exactly and and all other flows are zero
-    # annotated_samples = word.rawData_to_samples(args.scorer)
-    # # print(list(zip(annotated_samples['object'],annotated_samples['rewards'])))
-    # random_samples_with_replacement = random.choices(list(zip(annotated_samples['object'],annotated_samples['rewards'])), k=3)
-    # selected_samples = {'object':[],'rewards':[]}
-    # for s in random_samples_with_replacement:
-    #     selected_samples['object'].append(s[0])
-    #     selected_samples['rewards'].append(s[1])
-    # print('selected_samples are: ', selected_samples)
-    # Gflownet = Gflow_extrapolate(args,word,selected_samples)
-    # root = Gflownet.get_root()
-    # Gflownet.backward_reward_propagation(root)
-    # states_flows = Gflownet.get_states_flows()
-    # #sanity test of the fitted model
-    # print('based on the state_flows, total reward is: ', states_flows[0],'compared to ground truth' ,sum(selected_samples['rewards']))
-    # print('all state flows are: ',states_flows)
-    # edge_flows,edge_features = Gflownet.get_edges_flows()
-    # # print(edge_flows)
-    # scale = -edge_flows[0]
-    # edge_flows = [f+scale for f in edge_flows]
+    scorer,evidences = get_data(args)
+    args.scorer = scorer
+    word = Word(args,evidences)
+    #1)sample some flows and use backward decomposition to reconstruct the flows and check all flows reproduced exactly and and all other flows are zero
+    annotated_samples = word.rawData_to_samples(args.scorer)
+    # print(list(zip(annotated_samples['object'],annotated_samples['rewards'])))
+    random_samples_with_replacement = random.choices(list(zip(annotated_samples['object'],annotated_samples['rewards'])), k=3)
+    selected_samples = {'object':[],'rewards':[]}
+    for s in random_samples_with_replacement:
+        selected_samples['object'].append(s[0])
+        selected_samples['rewards'].append(s[1])
+    print('selected_samples are: ', selected_samples)
+    Gflownet = Gflow_extrapolate(args,word,selected_samples)
+    root = Gflownet.get_root()
+    Gflownet.backward_reward_propagation(root)
+    states_flows = Gflownet.get_states_flows()
+    #sanity test of the fitted model
+    print('based on the state_flows, total reward is: ', states_flows[0],'compared to ground truth' ,sum(selected_samples['rewards']))
+    print('all state flows are: ',states_flows)
+    edge_flows,edge_features = Gflownet.get_edges_flows()
+    # print(edge_flows)
+    scale = -edge_flows[0]
+    edge_flows = [f+scale for f in edge_flows]
 
 
     # we next check the statistics to ensure that dynamic insert works
@@ -93,8 +93,10 @@ def main(args):
     print('corresponding rewards of these trajectories are: ', trajectories_rewards)
     annotated_trajectories = {'object': trajectories, 'rewards': trajectories_rewards}
     Gflownet_active_learning_hypergrid.dynamic_insert(annotated_trajectories)
-    Gflownet_active_learning_hypergrid.backward_reward_propagation(Gflownet_active_learning.get_root())
-    Gflownet_active_learning_hypergrid.get_states_flows()
+    print('lets take a look at top 3 values')
+    Gflownet_active_learning_hypergrid.samples_structure.top_flows.peek_top_n(3)
+    print(Gflownet_active_learning_hypergrid.get_states_flows())
+    breakpoint()
     #2)try branching
     env = DiscreteEBM(ndim=args.ndim, alpha=args.alpha, device_str=device_str)
     Gflownet_active_learning = Gflow_extrapolate()

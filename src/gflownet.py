@@ -17,6 +17,33 @@ from src.samplers import extrapolate_Policy
 from gfn.states import States
 import torch
 from gfn.env import Env
+import math
+
+import heapq
+
+class MaxHeap:
+    def __init__(self,max_size = 20 ):
+        self.heap = []
+        self.max_size = max_size # Maximum size of the heap
+
+    def push(self, val, obj):
+        # Store a tuple of (inverted val, obj) to maintain max heap behavior
+        heapq.heappush(self.heap, (-val, obj))
+        # If the heap size exceeds max_size, remove the smallest element
+        if len(self.heap) > self.max_size:
+            heapq.heappop(self.heap)
+
+    def pop(self):
+        # Invert the value back and return both the value and the object
+        val, obj = heapq.heappop(self.heap)
+        return -val, obj
+
+    def peek_top_n(self, n=10):
+        # Return the top n values and their associated objects without removing them
+        return [(-val, obj) for val, obj in heapq.nsmallest(min(n, len(self.heap)), self.heap)]
+
+    def __len__(self):
+        return len(self.heap)
 
 class Gflow_node(Trie_node):
     def __init__(self,vocab_size,parent= None):
@@ -31,6 +58,7 @@ class Gflow_Trie(Trie):
         self.vocab_size = vocab_size
         self.root = self.getNode()
         self._num_sentences = 0
+        self.top_flows = MaxHeap()
 
     @property
     def num_sentences(self):
@@ -118,8 +146,12 @@ class Gflow_Trie(Trie):
         '''
         key = sample[0]
         reward = sample[1]
+        self.top_flows.push(reward,key)
         self.num_sentences += 1
-        assert key[-1] == -1 # check if end token exist
+        try:
+            assert key[-1] == -1 # check if end token exist
+        except:
+            breakpoint()
         # If not present, inserts key into trie
         # If the key is prefix of trie node,
         # just marks leaf node
@@ -250,7 +282,6 @@ class Gflow_extrapolate(GFlowNet):
         # Create a sequential model
         self.predictor = nn.Sequential(self.word.embedding,transformer_encoder, linear,flatten,additional_linear)
                                        # transformer_encoder, linear)
-
         self.optimizer = optim.Adam(self.predictor.parameters(), lr=0.001)
         self.loss_function = nn.MSELoss()
         # print(self.samples)
@@ -281,10 +312,9 @@ class Gflow_extrapolate(GFlowNet):
         :param sample:
         :return:
         '''
-        breakpoint()
         for s in zip(samples['object'],samples['rewards']):
             self.samples_structure.insert(s)
-            self.sample_wise_backward_reward_propagation(state = s, flows = s.flow, path = self.samples_structure.get_sentence(s))
+            self.sample_wise_backward_reward_propagation(state = self.samples_structure.get_state(s[0]), flows = s[1], path = s[0])
 
     # Define some GFlowNet methods required by torchgfn
     def sample_trajectories(
@@ -323,7 +353,7 @@ class Gflow_extrapolate(GFlowNet):
 
 
 
-    def sample_wise_backward_reward_propagation(self, state,flows,path):
+    def sample_wise_backward_reward_propagation(self, state,flows,path = None):
         '''
         Important assumption:
         We assume this function is called after and only after the insert function therefore we do not update node statistics like attempts(updated by the insert)
@@ -341,9 +371,21 @@ class Gflow_extrapolate(GFlowNet):
         :param path: if path is provided, the reward will propagated to states over that path and curiosity budget will be updated over that path
         :return:
         '''
-        curiosity_budget = lambda attempt,deviation:max(0, deviation**2/math.sqrt(attempt))
+        curiosity_budget = lambda attempt,deviation:max(0, deviation**2/math.sqrt(attempt+1))
         # surprise_threshold = lambda x:somefunction(state_flows)  lets dont consider activation of this feature
         if path:
+            for i in range(len(path)):
+                parent_path = path[:-(i+1)]
+                parent_state = self.samples_structure.get_state(parent_path)
+                if parent_state is self.samples_structure.root:
+                    break
+                parent_state.flow += flows
+                assert self.samples_structure.get_sentence(parent_state) ==  parent_path
+                print('parent_state dict', parent_state.__dict__, 'parent of parent state: ', parent_state.parent, 'parent of parent state dictionary: ', parent_state.parent.__dict__)
+                parent_state.curiosity_budget = curiosity_budget(parent_state.attempts, parent_state.flow - parent_state.parent.flow/len(list(filter(lambda x: x is not None,parent_state.parent.children))))
+                # if p.curiosity_budget > suprise_threshold(p):
+                #     self.sample(state)
+        else:
             parents = state.get_parent()
             while parents:
                 propagated_flows = flows/len(parents) # we use the maximum entropy criterion here
@@ -357,13 +399,6 @@ class Gflow_extrapolate(GFlowNet):
                         # if p.curiosity_budget > surprise_threshold(p): # null model does not need this part...
                         #     self.sample(state)  # we need to handle multi-threading here
                     self.sample_wise_backward_reward_propagation(p, propagated_flows)  # might need to add dynamic programming here
-        else:
-            back_ward_path = reversed(path)
-            for s in back_ward_path:
-                s.flow += flows
-                s.curiosity_budget = curiosity_budget(attempt,propagated_flows - p.parent.flow/len(p.parent.children()))
-                # if p.curiosity_budget > suprise_threshold(p):
-                #     self.sample(state)
 
 
     def sample(self, states):
@@ -447,19 +482,19 @@ class Gflow_extrapolate(GFlowNet):
         #Make this dynamic programming and states based.
         '''
         if cursor.end_of_Sentence:
-            if current_node.flows == None:
+            end_index = len(self.word.vocabulary)-1 # assumes 'end' is the last token
+            if cursor.flow == None:
                 raise Exception('The sample is incomplete because it has no reward')
-            return current_node.flows
+            return cursor.flow
         else:
             # assert cursor.flow ==None
             childrens = self.samples_structure.get_children(cursor)
             flow = 0
             for index, child in enumerate(childrens):
-                end_index = len(self.word.vocabulary)-1 # assumes 'end' is the last token
                 #update this node's flow by recursively backpropagate flows from children's node
                 if child:
-                    if child.flow ==None:
-                        child.flow = self.backward_reward_propagation(child,propogate_rule='max_entropy')
+                    # how do we know when to backward propagate
+                    child.flow = self.backward_reward_propagation(child,propogate_rule='max_entropy')
                     flow += child.flow
             cursor.flow = flow
             return flow
