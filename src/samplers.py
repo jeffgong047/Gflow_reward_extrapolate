@@ -63,15 +63,21 @@ class extrapolate_Policy(Sampler):
         # for child with no flows, the bias is that their flow = average flow given that state
         state_representation = self.memory.get_sentence(state)
         print('state representation is: ', state_representation)
-        state_reward = env.log_reward(trans.translate(state_representation, self.memory,env))   # For each environment we need to define processor(temporary) that converts from Trie state to torch.gfn state
+        try:
+            state_reward = env.log_reward(trans.translate(state_representation, self.memory,env))   # For each environment we need to define processor(temporary) that converts from Trie state to torch.gfn state
+        except:
+            state_reward = 0
         state_children = state.children
         if state.flow:
             average_flow = state.flow/len(list(filter(lambda x:x is not None, state_children)))
         else:
-            average_flow = 1
+            average_flow = state_reward
             # assert all(c is None for c in state.children) # exploration beyond state of zero flow is allowed, and without backward reward propagation, flow=0 can not indicates children existence
-
-
+        # should i update leaf nodes during explorations?
+        if state_children[-1] is None:
+            state_children[-1] = self.memory.getNode(parent=state)
+        state_children[-1].flow = state_reward
+        state_children[-1].end_of_Sentence = True
         state_flows = []
         for child in state_children[:-1]:
             if child:
@@ -80,11 +86,10 @@ class extrapolate_Policy(Sampler):
                 else:
                     state_flows.append(child.flow)
             else:
-                flow = average_flow
                 # the problem is if a state is not visited, how could it have curiosity budget?
                 # are we also considering curiosity budget of visited states(how to effectively scale w.r.t to time and childrens).
                 #Notice if we have curiosity budget, the average flow of visited states is larger than non-visited states
-                state_flows.append(flow)
+                state_flows.append(average_flow)
         state_flows.append(state_reward)
         z = sum(state_flows) + state_reward
         print('state flows are: ', torch.tensor(state_flows), 'normalizing constatnt is: ', z)
