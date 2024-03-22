@@ -85,7 +85,7 @@ def main(args):
     selected_samples_states = trans.translate(selected_samples)
     selected_samples_rewards = env.log_reward(final_states = selected_samples_states)
     annotated_selected_samples = {'object':selected_samples, 'rewards': selected_samples_rewards}
-    Gflownet_active_learning_hypergrid = Gflow_extrapolate(args, word, annotated_selected_samples) # the selected samples are pre-learnt
+    Gflownet_active_learning_hypergrid = Gflow_extrapolate(args, word, annotated_selected_samples, control = args.control) # the selected samples are pre-learnt
     Gflownet_active_learning_hypergrid.backward_reward_propagation(Gflownet_active_learning_hypergrid.get_root()) # if the initialization is with samples, backward propagation is required
     trajectories = Gflownet_active_learning_hypergrid.sample_trajectories(n_samples = 10, env= env)
     print('sampled trajectories are: ', trajectories)
@@ -97,13 +97,31 @@ def main(args):
     Gflownet_active_learning_hypergrid.samples_structure.top_flows.peek_top_n(3)
     print(Gflownet_active_learning_hypergrid.get_states_flows())
     breakpoint()
-    #2)try branching
-    env = DiscreteEBM(ndim=args.ndim, alpha=args.alpha, device_str=device_str)
-    Gflownet_active_learning = Gflow_extrapolate()
-    Gflownet_active_learning.insert(trajectories)
-    Gflownet_active_learning.backward_reward_propagation(Gflownet_active_learning.get_root())
-    trajectories = Gflownet_active_learning.sample_trajectories(n_samples = 10 , env= env)
-    Gflownet_active_learning.dynamic_insert(trajectories)
+    #2)try Ising models
+    env_Ising = DiscreteEBM(ndim=4, alpha=1.0, device_str=0)
+    evidences = {'full_samples':None,'elements':list(range(env.n_actions-1))}
+    word = Word(args, evidences)
+    selected_samples = [[0,1,2,3,4,5,6,7,-1], [0,1,2,7,11,5,6,7,-1],[4,5,2,7,4,9,6,7,-1,-1,-1],[4,1,2,3,4,9,10,7,-1],[0,1,2,3,8,9,10,11,-1]]
+    trans = translator()
+    selected_samples_states = trans.translate(selected_samples)
+    selected_samples_states.tensor.cuda()
+    selected_samples_rewards = env_Ising.log_reward(final_states = selected_samples_states)
+    annotated_selected_samples = {'object':selected_samples, 'rewards': selected_samples_rewards}
+    Gflownet_active_learning_Ising = Gflow_extrapolate(args, word, annotated_selected_samples) # the selected samples are pre-learnt
+    Gflownet_active_learning_Ising.backward_reward_propagation(Gflownet_active_learning_hypergrid.get_root()) # if the initialization is with samples, backward propagation is required
+    trajectories = Gflownet_active_learning_Ising.sample_trajectories(n_samples = 10, env= env)
+    print('sampled trajectories are: ', trajectories)
+    translated_trajectories = trans.translate(trajectories)
+    trans.translate(trajectories).tensor.cuda()
+    trajectories_rewards = env_Ising.log_reward(final_states = translated_trajectories)
+    print('corresponding rewards of these trajectories are: ', trajectories_rewards)
+    annotated_trajectories = {'object': trajectories, 'rewards': trajectories_rewards}
+    Gflownet_active_learning_hypergrid.dynamic_insert(annotated_trajectories)
+    print('lets take a look at top 3 values')
+    Gflownet_active_learning_hypergrid.samples_structure.top_flows.peek_top_n(3)
+    print(Gflownet_active_learning_hypergrid.get_states_flows())
+    breakpoint()
+
    # Supervised learning setting
     breakpoint()
     #we can improve upon the sampling of ground truths
@@ -164,6 +182,8 @@ if __name__ == '__main__':
                               help='Batch size (default: %(default)s)')
     optimization.add_argument('--num_iterations', type=int, default=100_000,
                               help='Number of iterations (default: %(default)s)')
+
+    optimization.add_argument('--control', type = str, default = 'likelihood', help = 'control strategy')
 
     # Replay buffer
     replay = parser.add_argument_group('Replay Buffer')

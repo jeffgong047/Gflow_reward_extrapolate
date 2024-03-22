@@ -253,7 +253,7 @@ class Flatten(nn.Module):
         return x.view(-1)
 
 class Gflow_extrapolate(GFlowNet):
-    def __init__(self,args,word=None,annotated_samples=None):
+    def __init__(self,args,word=None,annotated_samples=None, control='likelihood'):
         '''
         Mainly contains two organ: 1. data structure to hold all the structured edge flows 2. Transformer that can utilize the edge flows to extrapolate
         Algorithms to calculate edge flows and train the transformer to fit the flows
@@ -272,7 +272,9 @@ class Gflow_extrapolate(GFlowNet):
         super().__init__()
         self.word = word
         self.samples = annotated_samples
+        self.control_protocol = control
         self.samples_structure = self.preload_samples_structures()
+        self.sampler = extrapolate_Policy(self.samples_structure,control)
         transformer_encoder_layer = nn.TransformerEncoderLayer(d_model=args.embedding_dim, nhead=8)
         transformer_encoder = nn.TransformerEncoder(transformer_encoder_layer, num_layers=2)
         linear = nn.Linear(args.embedding_dim, 1)
@@ -327,8 +329,7 @@ class Gflow_extrapolate(GFlowNet):
         :param sample_off_policy:
         :return:
         '''
-        sampler = extrapolate_Policy(self.samples_structure)
-        trajectories = sampler.sample_trajectories(env,[self.samples_structure.root]*n_samples,n_samples) # gflow++ provides only on policy
+        trajectories = self.sampler.sample_trajectories(env,[self.samples_structure.root]*n_samples,n_samples) # gflow++ provides only on policy
         return trajectories
         # first sample trajectories using current learnt gflownet(trie)
 
@@ -382,7 +383,8 @@ class Gflow_extrapolate(GFlowNet):
                 parent_state.flow += flows
                 assert self.samples_structure.get_sentence(parent_state) ==  parent_path
                 print('parent_state dict', parent_state.__dict__, 'parent of parent state: ', parent_state.parent, 'parent of parent state dictionary: ', parent_state.parent.__dict__)
-                parent_state.curiosity_budget = curiosity_budget(parent_state.attempts, parent_state.flow - parent_state.parent.flow/len(list(filter(lambda x: x is not None,parent_state.parent.children))))
+                if self.control_protocol == 'curiosity_guided':
+                    parent_state.curiosity_budget = curiosity_budget(parent_state.attempts, parent_state.flow - parent_state.parent.flow/len(list(filter(lambda x: x is not None,parent_state.parent.children))))
                 # if p.curiosity_budget > suprise_threshold(p):
                 #     self.sample(state)
         else:
@@ -394,8 +396,8 @@ class Gflow_extrapolate(GFlowNet):
                         p.flow += propagated_flows
                     else:
                         p.flow += propagated_flows
-
-                        p.curiosity_budget = curiosity_budget(attempt,propagated_flows - p.parent.flow/len(p.parent.children())) #how to scale the curiosity budget? curiosity(t,attempts,surprise)
+                        if self.control_protocol == 'curiosity_guided':
+                            p.curiosity_budget = curiosity_budget(attempt,propagated_flows - p.parent.flow/len(p.parent.children())) #how to scale the curiosity budget? curiosity(t,attempts,surprise)
                         # if p.curiosity_budget > surprise_threshold(p): # null model does not need this part...
                         #     self.sample(state)  # we need to handle multi-threading here
                     self.sample_wise_backward_reward_propagation(p, propagated_flows)  # might need to add dynamic programming here

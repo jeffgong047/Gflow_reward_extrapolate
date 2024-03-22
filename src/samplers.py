@@ -15,6 +15,7 @@ class extrapolate_Policy(Sampler):
     def __init__(
             self,
             memory,
+            control,
             **probability_distribution_kwargs,
     ) -> None:
         '''
@@ -25,6 +26,7 @@ class extrapolate_Policy(Sampler):
         self.memory = memory
         self.probability_distribution_kwargs = probability_distribution_kwargs
         self.T= 1
+        self.control_protocol = control
     def sample_actions(
             self, env: Env, state
     ):
@@ -73,9 +75,12 @@ class extrapolate_Policy(Sampler):
         state_flows = []
         for child in state_children[:-1]:
             if child:
-                state_flows.append(child.flow + child.curiosity_budget)
+                if self.control_protocol == 'curiosity_guided':
+                    state_flows.append(child.flow + child.curiosity_budget)
+                else:
+                    state_flows.append(child.flow)
             else:
-                flow = state_reward
+                flow = average_flow
                 # the problem is if a state is not visited, how could it have curiosity budget?
                 # are we also considering curiosity budget of visited states(how to effectively scale w.r.t to time and childrens).
                 #Notice if we have curiosity budget, the average flow of visited states is larger than non-visited states
@@ -109,15 +114,13 @@ class extrapolate_Policy(Sampler):
         '''
         trajectories = []
         for i in range(n_trajectories):
-            trajectory = []
             state = states[i]
             while(True):
                 action = self.sample_actions(env,state)
                 print('original state is: ', state)
                 print('action being taken is: ', action)
-                trajectory.append(action)
                 actions = env.step_trie(self.memory.get_sentence(state), action) # need to specify how to communicate with environment
-                if actions:
+                if actions[-1]!=-1:
                     state = self.memory.get_state(actions[:-1])
                     if state.children[action] is None:
                         state.children[action] = self.memory.getNode(parent=state) #we could update curiosity budget here
@@ -125,11 +128,11 @@ class extrapolate_Policy(Sampler):
                     if action ==-1 :
                         state.end_of_Sentence = True
                     print('new state is: ', state)
-                    print('current trajectory is: ', trajectory)
+                    print('current trajectory is: ', actions)
                 else:
-                    print('stop current trajectory ...', trajectory)
+                    print('stop current trajectory ...', actions)
                     break
-            trajectories.append(trajectory)
+            trajectories.append(actions)
         return trajectories
 
 
