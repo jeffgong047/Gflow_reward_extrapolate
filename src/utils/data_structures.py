@@ -1,32 +1,34 @@
 from abc import ABC, abstractmethod
 
 import networkx as nx
-#
-#
-#
-# class samples(ABC):
-#     '''
-#     samples class was written in the spirit to organize the training data better for running gflow-extrapolate algorithms
-#     Our implementation of samples are based upon strings
-#     '''
-#     def __init__(self, data, sample_structure):
-#         '''
-#         :param data: Preprocessed data where each data point is a word. Characters are indexes where elements that composed the object mapped to.
-#         :param sample_structure:
-#         notes: Based on sample structure, the data can be transformed to desired format before storing in the suitable data structures
-#         '''
-#         self.samples_seq = jpn.array(array_like)
-#         self.num_samples = array_like[0]
-#         self.samples_structure = self.organize_samples(self.samples_seq)
-#     def organize_samples(self,samples):
-#         samples_structure = marisa_trie.Trie(samples)
-#         return samples_structure
-#
-#     def samplesWithPrefix(self, prefix):
-#         return self.samples_structure.keys(prefix)
-#     def samplesPrefixQuery(self, query):
-#         return self.samples_structure.prefixes(query)
 
+
+
+import heapq
+
+class MaxHeap:
+    def __init__(self,max_size = 20 ):
+        self.heap = []
+        self.max_size = max_size # Maximum size of the heap
+
+    def push(self, val, obj):
+        # Store a tuple of (inverted val, obj) to maintain max heap behavior
+        heapq.heappush(self.heap, (-val, obj))
+        # If the heap size exceeds max_size, remove the smallest element
+        if len(self.heap) > self.max_size:
+            heapq.heappop(self.heap)
+
+    def pop(self):
+        # Invert the value back and return both the value and the object
+        val, obj = heapq.heappop(self.heap)
+        return -val, obj
+
+    def peek_top_n(self, n=10):
+        # Return the top n values and their associated objects without removing them
+        return [(-val, obj) for val, obj in heapq.nsmallest(min(n, len(self.heap)), self.heap)]
+
+    def __len__(self):
+        return len(self.heap)
 
 class Trie_node():
     def __init__(self,vocab_size):

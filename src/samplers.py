@@ -5,6 +5,7 @@ import numpy as np
 from src.utils import translator
 import torch
 import torch.nn.functional as F
+from gfn.gym.discrete_ebm import DiscreteEBM
 trans = translator()
 
 class States_triv(States):
@@ -43,11 +44,17 @@ class extrapolate_Policy(Sampler):
                 the sampled actions under the probability distribution of the given
                 states.
         """
-
-        dist = F.softmax(self.exploration_strategy(state, env),dim=0)
+        logits = self.exploration_strategy(state,env)
+        # for the sake of getting results faster, we manually create a mask here if the environment is Ising
+        dont_stop = type(env) == DiscreteEBM and len(self.memory.get_sentence(state))< env.ndim # this should be encapsulated within the environment instead of being specified by sampling function
+        if dont_stop:
+            logits[-1] = float('-inf')
+        dist = F.softmax(logits,dim=0)
         print('distribution is: ', dist)
-        action = np.random.multinomial(1, dist.cpu().numpy())
-        action_index = np.argmax(action)
+        action_index = torch.multinomial(dist, num_samples=1, replacement=True).item()
+        print('selected action is: ', action_index)
+        if dont_stop and action_index == len(dist):
+            breakpoint()
         action_index = -1  if action_index +1 == len(dist) else action_index
         print('selected action is: ', action_index)
         return action_index
@@ -68,6 +75,7 @@ class extrapolate_Policy(Sampler):
         except:
             state_reward = 0
         state_children = state.children
+        assert len(state.children) == self.memory.vocab_size
         if state.flow:
             average_flow = state.flow/len(list(filter(lambda x:x is not None, state_children)))
         else:
@@ -75,7 +83,8 @@ class extrapolate_Policy(Sampler):
             # assert all(c is None for c in state.children) # exploration beyond state of zero flow is allowed, and without backward reward propagation, flow=0 can not indicates children existence
         # should i update leaf nodes during explorations?
         if state_children[-1] is None:
-            state_children[-1] = self.memory.getNode(parent=state)
+            state_children[-1] = self.memory.getNode()
+            state_children[-1].add_parent(-1,state)
         state_children[-1].flow = state_reward
         state_children[-1].end_of_Sentence = True
         state_flows = []
@@ -91,10 +100,11 @@ class extrapolate_Policy(Sampler):
                 #Notice if we have curiosity budget, the average flow of visited states is larger than non-visited states
                 state_flows.append(average_flow)
         state_flows.append(state_reward)
-        z = sum(state_flows) + state_reward
+        z = max(sum(state_flows) + state_reward, 1)
         print('state flows are: ', torch.tensor(state_flows), 'normalizing constatnt is: ', z)
         logits = torch.tensor(state_flows).cuda()/abs(z)
         #we need to define curiosity for each state
+        logits = torch.where(torch.isnan(logits), torch.tensor(0.0).cuda(), logits)
         return logits
 
 
@@ -125,10 +135,12 @@ class extrapolate_Policy(Sampler):
                 print('original state is: ', state)
                 print('action being taken is: ', action)
                 actions = env.step_trie(self.memory.get_sentence(state), action) # need to specify how to communicate with environment
+                assert actions is not None
                 if actions[-1]!=-1:
                     state = self.memory.get_state(actions[:-1])
                     if state.children[action] is None:
-                        state.children[action] = self.memory.getNode(parent=state) #we could update curiosity budget here
+                        state.children[action] = self.memory.getNode() #we could update curiosity budget here
+                        state.children[action].add_parent(action,state)
                     state = state.children[action]
                     if action ==-1 :
                         state.end_of_Sentence = True

@@ -46,81 +46,99 @@ def visualize_prediction_accuracy(predictions, targets):
     plt.savefig('./prediction_accuracy.png')
     plt.show()
 
+
+
+
 def main(args):
     #basic test on signaling pathway dataset
-    scorer,evidences = get_data(args)
-    args.scorer = scorer
-    word = Word(args,evidences)
-    #1)sample some flows and use backward decomposition to reconstruct the flows and check all flows reproduced exactly and and all other flows are zero
-    annotated_samples = word.rawData_to_samples(args.scorer)
-    # print(list(zip(annotated_samples['object'],annotated_samples['rewards'])))
-    random_samples_with_replacement = random.choices(list(zip(annotated_samples['object'],annotated_samples['rewards'])), k=3)
-    selected_samples = {'object':[],'rewards':[]}
-    for s in random_samples_with_replacement:
-        selected_samples['object'].append(s[0])
-        selected_samples['rewards'].append(s[1])
-    print('selected_samples are: ', selected_samples)
-    Gflownet = Gflow_extrapolate(args,word,selected_samples)
-    root = Gflownet.get_root()
-    Gflownet.backward_reward_propagation(root)
-    states_flows = Gflownet.get_states_flows()
-    #sanity test of the fitted model
-    print('based on the state_flows, total reward is: ', states_flows[0],'compared to ground truth' ,sum(selected_samples['rewards']))
-    print('all state flows are: ',states_flows)
-    edge_flows,edge_features = Gflownet.get_edges_flows()
-    # print(edge_flows)
-    scale = -edge_flows[0]
-    edge_flows = [f+scale for f in edge_flows]
+    # scorer,evidences = get_data(args)
+    # args.scorer = scorer
+    # word = Word(args,evidences)
+    # #1)sample some flows and use backward decomposition to reconstruct the flows and check all flows reproduced exactly and and all other flows are zero
+    # annotated_samples = word.rawData_to_samples(args.scorer)
+    # # print(list(zip(annotated_samples['object'],annotated_samples['rewards'])))
+    # random_samples_with_replacement = random.choices(list(zip(annotated_samples['object'],annotated_samples['rewards'])), k=3)
+    # selected_samples = {'object':[],'rewards':[]}
+    # for s in random_samples_with_replacement:
+    #     selected_samples['object'].append(s[0])
+    #     selected_samples['rewards'].append(s[1])
+    # print('selected_samples are: ', selected_samples)
+    # Gflownet = Gflow_extrapolate(args,word,selected_samples)
+    # root = Gflownet.get_root()
+    # Gflownet.backward_reward_propagation(root)
+    # states_flows = Gflownet.get_states_flows()
+    # #sanity test of the fitted model
+    # print('based on the state_flows, total reward is: ', states_flows[0],'compared to ground truth' ,sum(selected_samples['rewards']))
+    # print('all state flows are: ',states_flows)
+    # edge_flows,edge_features = Gflownet.get_edges_flows()
+    # # print(edge_flows)
+    # scale = -edge_flows[0]
+    # edge_flows = [f+scale for f in edge_flows]
 
 
     # we next check the statistics to ensure that dynamic insert works
     # In hyper-grid show that backward_propagation works
-    env = HyperGrid(
-        2, 8, 0.1, 0.5, 2, reward_cos = True,device_str=0
-    )
-    evidences = {'full_samples':None,'elements':list(range(env.n_actions-1))}
-    word = Word(args, evidences)
-    selected_samples = [[0,1,-1,-1], [0,-1,-1,-1],[1,-1,-1,-1],[1,1,-1,-1],[1,0,1,-1]]
-    trans = translator()
-    selected_samples_states = trans.translate(selected_samples)
-    selected_samples_rewards = env.log_reward(final_states = selected_samples_states)
-    annotated_selected_samples = {'object':selected_samples, 'rewards': selected_samples_rewards}
-    Gflownet_active_learning_hypergrid = Gflow_extrapolate(args, word, annotated_selected_samples, control = args.control) # the selected samples are pre-learnt
-    Gflownet_active_learning_hypergrid.backward_reward_propagation(Gflownet_active_learning_hypergrid.get_root()) # if the initialization is with samples, backward propagation is required
-    trajectories = Gflownet_active_learning_hypergrid.sample_trajectories(n_samples = 10, env= env)
-    print('sampled trajectories are: ', trajectories)
-    trajectories_rewards = env.log_reward(final_states = trans.translate(trajectories))
-    print('corresponding rewards of these trajectories are: ', trajectories_rewards)
-    annotated_trajectories = {'object': trajectories, 'rewards': trajectories_rewards}
-    Gflownet_active_learning_hypergrid.dynamic_insert(annotated_trajectories)
-    print('lets take a look at top 3 values')
-    Gflownet_active_learning_hypergrid.samples_structure.top_flows.peek_top_n(3)
-    print(Gflownet_active_learning_hypergrid.get_states_flows())
-    breakpoint()
+    # env = HyperGrid(
+    #     2, 8, 0.1, 0.5, 2, reward_cos = True,device_str=0
+    # )
+    # evidences = {'full_samples':None,'elements':list(range(env.n_actions-1))}
+    # word = Word(args, evidences)
+    # selected_samples = [[0,1,-1,-1], [0,-1,-1,-1],[1,-1,-1,-1],[1,1,-1,-1],[1,0,1,-1]]
+    # trans = translator()
+    # selected_samples_states = trans.translate(selected_samples)
+    # selected_samples_rewards = env.log_reward(final_states = selected_samples_states)
+    # annotated_selected_samples = {'object':selected_samples, 'rewards': selected_samples_rewards}
+    # Gflownet_active_learning_hypergrid = Gflow_extrapolate(args, word, annotated_selected_samples, control = args.control) # the selected samples are pre-learnt
+    # Gflownet_active_learning_hypergrid.backward_reward_propagation(Gflownet_active_learning_hypergrid.get_root()) # if the initialization is with samples, backward propagation is required
+    # trajectories = Gflownet_active_learning_hypergrid.sample_trajectories(n_samples = 10, env= env)
+    # print('sampled trajectories are: ', trajectories)
+    # trajectories_rewards = env.log_reward(final_states = trans.translate(trajectories))
+    # print('corresponding rewards of these trajectories are: ', trajectories_rewards)
+    # annotated_trajectories = {'object': trajectories, 'rewards': trajectories_rewards}
+    # Gflownet_active_learning_hypergrid.dynamic_insert(annotated_trajectories)
+    # print('lets take a look at top 3 values')
+    # Gflownet_active_learning_hypergrid.samples_structure.top_flows.peek_top_n(3)
+    # print(Gflownet_active_learning_hypergrid.get_states_flows())
+    # breakpoint()
     #2)try Ising models
-    env_Ising = DiscreteEBM(ndim=4, alpha=1.0, device_str=0)
-    evidences = {'full_samples':None,'elements':list(range(env.n_actions-1))}
-    word = Word(args, evidences)
-    selected_samples = [[0,1,2,3,4,5,6,7,-1], [0,1,2,7,11,5,6,7,-1],[4,5,2,7,4,9,6,7,-1,-1,-1],[4,1,2,3,4,9,10,7,-1],[0,1,2,3,8,9,10,11,-1]]
+    all_sampled_trajectories = {}
+    env_Ising = DiscreteEBM(ndim=8, alpha=1.0, device_str=0)
+    evidences = {'full_samples':None,'elements':list(range(2))} # Notice, if we do not care permutation of Ising model's states, we only need 2 actions
+    word = Word(args, evidences) #initialization of the word object requires elements and end element have to be specified as 'end'
+    selected_samples = [[0,1,0,1,1,1,1,1,-1], [0,1,1,0,0,0,0,1,-1],[0,0,1,1,0,1,1,0,-1],[1,1,0,0,0,0,1,0,-1],[0,0,1,1,0,1,0,0,-1]]
     trans = translator()
-    selected_samples_states = trans.translate(selected_samples)
-    selected_samples_states.tensor.cuda()
+    selected_samples_states = trans.translate(selected_samples,env= env_Ising)
     selected_samples_rewards = env_Ising.log_reward(final_states = selected_samples_states)
+    print('the rewards of known trajectories are: ', selected_samples_rewards)
+    all_sampled_trajectories.update({tuple(s): r.item() for s , r in zip(selected_samples,selected_samples_rewards)})
     annotated_selected_samples = {'object':selected_samples, 'rewards': selected_samples_rewards}
     Gflownet_active_learning_Ising = Gflow_extrapolate(args, word, annotated_selected_samples) # the selected samples are pre-learnt
-    Gflownet_active_learning_Ising.backward_reward_propagation(Gflownet_active_learning_hypergrid.get_root()) # if the initialization is with samples, backward propagation is required
-    trajectories = Gflownet_active_learning_Ising.sample_trajectories(n_samples = 10, env= env)
-    print('sampled trajectories are: ', trajectories)
-    translated_trajectories = trans.translate(trajectories)
-    trans.translate(trajectories).tensor.cuda()
-    trajectories_rewards = env_Ising.log_reward(final_states = translated_trajectories)
-    print('corresponding rewards of these trajectories are: ', trajectories_rewards)
-    annotated_trajectories = {'object': trajectories, 'rewards': trajectories_rewards}
-    Gflownet_active_learning_hypergrid.dynamic_insert(annotated_trajectories)
-    print('lets take a look at top 3 values')
-    Gflownet_active_learning_hypergrid.samples_structure.top_flows.peek_top_n(3)
-    print(Gflownet_active_learning_hypergrid.get_states_flows())
+    Gflownet_active_learning_Ising.backward_reward_propagation(Gflownet_active_learning_Ising.get_root()) # if the initialization is with samples, backward propagation is required
+    print(Gflownet_active_learning_Ising.samples_structure.top_flows.peek_top_n(3))
+    print(Gflownet_active_learning_Ising.get_states_flows())
     breakpoint()
+    for i in range(5):
+        trajectories = Gflownet_active_learning_Ising.sample_trajectories(n_samples = 3, env= env_Ising)
+        print('sampled trajectories are: ', trajectories)
+        translated_trajectories = trans.translate(trajectories)
+        trajectories_rewards = env_Ising.log_reward(final_states = translated_trajectories)
+        annotated_trajectories = {'object': trajectories, 'rewards': trajectories_rewards}
+        Gflownet_active_learning_Ising.dynamic_insert(annotated_trajectories)
+        print('corresponding rewards of these trajectories are: ', trajectories_rewards)
+        print('lets take a look at top 3 values')
+        print('Total explored states are: ', Gflownet_active_learning_Ising.samples_structure.num_sentences)
+        print(Gflownet_active_learning_Ising.samples_structure.top_flows.peek_top_n(3))
+        print(Gflownet_active_learning_Ising.get_states_flows())
+        all_sampled_trajectories.update({tuple(s): r.item() for s , r in zip(trajectories, trajectories_rewards)})
+    counts = 0
+    total_reward = 0
+    for v in all_sampled_trajectories.values():
+        total_reward += v
+        counts +=1
+    print('total reward is : ',total_reward, 'and it equals to???: ',Gflownet_active_learning_Ising.samples_structure.root.flow, ' ???')
+    print('total unique trajectories is: ', counts, 'and it equals to???', Gflownet_active_learning_Ising.samples_structure.num_sentences, ' ???')
+    print('top 3 flows :', Gflownet_active_learning_Ising.samples_structure.top_flows.peek_top_n(3))
+    print('average reward is : ', total_reward/counts)
 
    # Supervised learning setting
     breakpoint()

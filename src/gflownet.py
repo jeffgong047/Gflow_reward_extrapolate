@@ -2,6 +2,7 @@
 import torch
 from src.preprocessors import Word
 from src.utils import Trie, Trie_node
+from src.utils.data_structures import MaxHeap
 import random
 from abc import ABC
 from sklearn.metrics import mean_squared_error, log_loss
@@ -19,44 +20,24 @@ import torch
 from gfn.env import Env
 import math
 
-import heapq
 
-class MaxHeap:
-    def __init__(self,max_size = 20 ):
-        self.heap = []
-        self.max_size = max_size # Maximum size of the heap
-
-    def push(self, val, obj):
-        # Store a tuple of (inverted val, obj) to maintain max heap behavior
-        heapq.heappush(self.heap, (-val, obj))
-        # If the heap size exceeds max_size, remove the smallest element
-        if len(self.heap) > self.max_size:
-            heapq.heappop(self.heap)
-
-    def pop(self):
-        # Invert the value back and return both the value and the object
-        val, obj = heapq.heappop(self.heap)
-        return -val, obj
-
-    def peek_top_n(self, n=10):
-        # Return the top n values and their associated objects without removing them
-        return [(-val, obj) for val, obj in heapq.nsmallest(min(n, len(self.heap)), self.heap)]
-
-    def __len__(self):
-        return len(self.heap)
 
 class Gflow_node(Trie_node):
-    def __init__(self,vocab_size,parent= None):
+    def __init__(self,vocab_size):
         super().__init__(vocab_size)
         self.flow = 0
         self.attempts = 0
-        self.parent = parent
+        self.parents = [None]*(vocab_size-1)
         self.curiosity_budget = 0
+    def add_parent(self, index, node):
+        self.parents[index] = node
+
 class Gflow_Trie(Trie):
     def __init__(self,vocab_size):
         # self.vocab = vocab
         self.vocab_size = vocab_size
         self.root = self.getNode()
+        self.root.add_parent(0,0)
         self._num_sentences = 0
         self.top_flows = MaxHeap()
 
@@ -75,38 +56,45 @@ class Gflow_Trie(Trie):
             if cursor is None:
                 cursor.children[i] = self.getNode(cursor)
             cursor = cursor.children[i]
-            try:
-                assert (cursor.end_of_Sentence) == (cursor.parent.children[-1] is cursor)
-            except:
-                breakpoint()
-                a=1
-                b=2
-                c=a+b
+            # try:
+            #     assert (cursor.end_of_Sentence) == (cursor.parents.children[-1] is cursor)
+            # except:
+            #     breakpoint()
+            #     a=1
+            #     b=2
+            #     c=a+b
         return cursor
 
     def get_sentence(self, state):
         '''
+        If there are multiple parent for a given state, action sequence based state representation wont be unique;
+        how to handle this? Well we can just return the first parent, and this action sequence should be
         Go from a state to sentence
         :return:
         '''
         sentence = []
         assert state is not None
-        parent = state.parent
-        child = state
-        while parent is not None:
+        if state == self.root:
+            return []
+        parent = list(filter(lambda x:x is not None, state.parents))[0]
+        while parent is not None and parent !=0:
             action = None
             for index, element in enumerate(parent.children):
-                if element == child:
+                if element == state:
                     action = index
-            assert action is not None
+            try:
+                assert action is not None
+            except:
+                breakpoint()
             sentence.append(action)
-            child = parent
-            parent = parent.parent
+            state = parent
+            parent = list(filter(lambda x:x is not None, state.parents))[0]
+
         return list(reversed(sentence))
 
 
-    def getNode(self,parent=None):
-        return Gflow_node(self.vocab_size,parent)
+    def getNode(self):
+        return Gflow_node(self.vocab_size)
 
     # def _charToIndex(self,ch):
     #
@@ -146,8 +134,6 @@ class Gflow_Trie(Trie):
         '''
         key = sample[0]
         reward = sample[1]
-        self.top_flows.push(reward,key)
-        self.num_sentences += 1
         try:
             assert key[-1] == -1 # check if end token exist
         except:
@@ -161,13 +147,21 @@ class Gflow_Trie(Trie):
             index = key[level]
             # if current character is not present
             if not pCrawl.children[index]:
-                pCrawl.add_child(index, self.getNode(parent=pCrawl))
+                pCrawl.add_child(index, self.getNode())
+            pCrawl.children[index].add_parent(index,pCrawl)
             pCrawl = pCrawl.children[index]
             pCrawl.attempts +=1
             if index==-1: # handle padding in a lazy way
                 break
         # mark last node as leaf
-        pCrawl.end_of_Sentence = True  #pCrawl is after taking the end action
+        if pCrawl.flow:
+            assert pCrawl.flow == reward
+            assert pCrawl.end_of_Sentence == True
+        else:
+            pCrawl.end_of_Sentence = True  #pCrawl is after taking the end action
+            pCrawl.flow = reward
+            self.top_flows.push(reward.item(),key)
+            self.num_sentences += 1
         try:
             assert index == -1
         except:
@@ -175,8 +169,6 @@ class Gflow_Trie(Trie):
             a=1
             b=2
             c=a+b
-        pCrawl.flow = reward
-
 
 
     def get_edge_flow(self,source,target):
@@ -290,6 +282,54 @@ class Gflow_extrapolate(GFlowNet):
     #    self.transformer = transformer(word)
     #     self.optimizer = optim.Adam([var1, var2], lr=0.0001)
 
+
+    def equilibrium(self,state):
+        if state:
+            parents = state.parents
+            children = state.children
+            flows_in ,flows_out  = 0 , 0
+            for s in parents:
+                if s:
+                    flows_in += s.flow
+            for s in children[:-1]:
+                if s:
+                    flows_out += s.flow
+            state_reward = children[-1].flow if children[-1].flow else 0  # we assume that
+            return flows_in  == flows_out + state_reward
+        else:
+            return True
+
+    def checker(self):
+        '''
+        The goal of the checker is to ensure that
+        :param G: networkx graph
+        :return:
+        The goal is to traverse through all states to ensure that total flows in = total flows out from each state
+        '''
+        G = self.samples_structure
+        for s in G.nodes():
+            # print('current node is: ',s)
+            # print('neighbor of s are: ', list(G.neighbors(s)))
+            neighbors = np.array(list(G.neighbors(s)))
+            neighbors_relationship = neighbors.sum(axis=-1)-sum(s)
+            neighbors_values = []
+            for n, r in zip(G.neighbors(s), neighbors_relationship):
+                if r==1:
+                    neighbors_values.append(G[s][n]['flow'])
+                elif r==-1:
+                    neighbors_values.append(G[n][s]['flow'])
+                else:
+                    raise ValueError
+            neighbors_values = np.array(neighbors_values)
+            # print(np.sum(neighbors_values*neighbors_relationship))
+            if len(list(G.neighbors(s)))>2: #this is to avoid root
+                try:
+                    assert abs(np.sum(neighbors_values*neighbors_relationship)+ reward_distribution(States_triv(torch.tensor(s)))) <1e-02
+                    print('in_flow and out_flow balanced, sum in flow = sum out flow + reward for state ', s)
+                except Exception as e:
+                    print(s, list(G.neighbors(s)), neighbors_values)
+                    breakpoint()
+
     def to_states(self,state):
         '''
 
@@ -372,21 +412,31 @@ class Gflow_extrapolate(GFlowNet):
         :param path: if path is provided, the reward will propagated to states over that path and curiosity budget will be updated over that path
         :return:
         '''
+        if state.flow is not None:  # the assumption is wrong which introduce logical bug. The flow has been inserted before this function being called
+            assert state.flow == flows
+            if all([self.equilibrium(s) for s in state.parents]):
+                return
+
         curiosity_budget = lambda attempt,deviation:max(0, deviation**2/math.sqrt(attempt+1))
         # surprise_threshold = lambda x:somefunction(state_flows)  lets dont consider activation of this feature
+        touched_root= False
         if path:
             for i in range(len(path)):
                 parent_path = path[:-(i+1)]
                 parent_state = self.samples_structure.get_state(parent_path)
-                if parent_state is self.samples_structure.root:
-                    break
+                if len(parent_path) ==0:
+                    assert parent_state == self.samples_structure.root
+                    touched_root = True
                 parent_state.flow += flows
                 assert self.samples_structure.get_sentence(parent_state) ==  parent_path
-                print('parent_state dict', parent_state.__dict__, 'parent of parent state: ', parent_state.parent, 'parent of parent state dictionary: ', parent_state.parent.__dict__)
-                if self.control_protocol == 'curiosity_guided':
+                # print('parent_state dict', parent_state.__dict__, 'parent of parent state: ', parent_state.parent, 'parent of parent state dictionary: ', parent_state.parent.__dict__)
+                if self.control_protocol == 'curiosity_guided'and parent_state is not self.samples_structure.root:
                     parent_state.curiosity_budget = curiosity_budget(parent_state.attempts, parent_state.flow - parent_state.parent.flow/len(list(filter(lambda x: x is not None,parent_state.parent.children))))
+                if parent_state is self.samples_structure.root:
+                    break
                 # if p.curiosity_budget > suprise_threshold(p):
-                #     self.sample(state)
+                #     self.sample(state)'
+            assert touched_root == True
         else:
             parents = state.get_parent()
             while parents:

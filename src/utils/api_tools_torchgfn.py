@@ -2,10 +2,12 @@ from abc import ABC
 from gfn.states import States
 from gfn.actions import Actions
 import torch
+from gfn.gym.discrete_ebm import DiscreteEBM
 from torch.nn.utils.rnn import pad_sequence
+import numpy as np
 class States_triv(States):
     def __init__(self,tensor):
-        self.tensor = tensor
+        self.tensor = tensor.cuda()
 
 
 
@@ -35,10 +37,11 @@ class translator(ABC):
             if isinstance(data[0], list):
                 batch_data = [torch.tensor(d) for d in data]
                 padded_batch = pad_sequence(batch_data, batch_first = True)
-                padded_batch[padded_batch == 0 ] = -1
+                padded_batch[padded_batch == 0] = -1
                 tensor_data = padded_batch
             else:
                 tensor_data = torch.tensor(data)
+            tensor_data = tensor_data[...,:-1]
             return States_triv(tensor_data)
 
 
