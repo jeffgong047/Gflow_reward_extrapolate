@@ -187,7 +187,7 @@ class Gflow_Trie(Trie):
         return pCrawl.flow
 
 
-    def get_All_states_flow(self):
+    def get_All_states_flow(self, leaf_only = False):
         '''
         This algorithm returns topological sorted state flow values of nodes in the trie and corresponding ordered state features
         :return:
@@ -202,11 +202,16 @@ class Gflow_Trie(Trie):
             # states.append(node)
             if node:
                 children = node.children
-                for i in range(self.vocab_size):
+                if node.children[-1]:
+                    if node.children[-1].end_of_Sentence:
+                        print('for the state: ', self.get_sentence(node), 'the reward of that state is: ',node.children[-1].flow)
+                for i in range(self.vocab_size-1): #we dont add the stop states
                     child = children[i]
                     queue.append(child)
             else:
                 flows.append(None)
+
+
         # features = []
         # breakpoint()
         # for s in states:
@@ -347,6 +352,8 @@ class Gflow_extrapolate(GFlowNet):
         :return: of shape (batch_size, action_cardinality)
         '''
         return sample(args,kwargs)
+
+
 
     def dynamic_insert(self,samples):
         '''

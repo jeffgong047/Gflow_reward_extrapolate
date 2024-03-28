@@ -3,6 +3,7 @@ from gfn.states import States
 from gfn.actions import Actions
 import torch
 from gfn.gym.discrete_ebm import DiscreteEBM
+from gfn.gym.hypergrid import  HyperGrid
 from torch.nn.utils.rnn import pad_sequence
 import numpy as np
 class States_triv(States):
@@ -14,6 +15,7 @@ class States_triv(States):
 
 class translator(ABC):
     '''
+
     The goal of this object is to ensure efficient communication between Trie implementation of the gflow++ with torchgfn package
     through unified states and action representation offered by torchgfn
     we found that the translator approach is too tedious, the most efficient way is to let the environment directly compatible with gflow++ due to
@@ -34,7 +36,9 @@ class translator(ABC):
                 return env.States(env.s0)
             # if data[-1] == gflow_plus_plus.vocabulary['end']: #Probably need to consider end case later
             #     return env.sf
-            if isinstance(data[0], list):
+            if type(env) == HyperGrid:
+                ''' TO DO!!! we need to set environments to have
+                    attribute that indicates whether it can terminate at variable length such that padding is required'''
                 batch_data = [torch.tensor(d) for d in data]
                 padded_batch = pad_sequence(batch_data, batch_first = True)
                 padded_batch[padded_batch == 0] = -1

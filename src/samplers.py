@@ -109,8 +109,6 @@ class extrapolate_Policy(Sampler):
 
 
 
-
-
     def sample_trajectories(
             self,
             env: Env,

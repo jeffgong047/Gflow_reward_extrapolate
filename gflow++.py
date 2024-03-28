@@ -1,8 +1,6 @@
 import sys
 import random
 import matplotlib.pyplot as plt
-
-print(sys.path)
 from argparse import ArgumentParser
 from pathlib import Path
 import json
@@ -17,6 +15,7 @@ from gfn.gym import HyperGrid
 import torch
 import numpy as np
 from src.utils import translator
+import itertools
 
 class CustomDataset(Dataset):
     def __init__(self, data, labels):
@@ -28,6 +27,13 @@ class CustomDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.data[idx], self.labels[idx]
+
+
+def enumerate_Ising_states(ndim):  # equivalent to build_grid function for hypergrid experiment setting
+    items = [0,1]
+
+    all_states = list(itertools.product(items,repeat = ndim))
+    return [s + (-1,) for s in all_states]
 
 
 def visualize_prediction_accuracy(predictions, targets):
@@ -103,21 +109,28 @@ def main(args):
     #2)try Ising models
     all_sampled_trajectories = {}
     env_Ising = DiscreteEBM(ndim=8, alpha=1.0, device_str=0)
+    all_states = enumerate_Ising_states(env_Ising.ndim)
+    trans = translator()
+    all_states_rewards = env_Ising.log_reward(trans.translate(all_states, env= env_Ising))
+    print( all_states_rewards )
     evidences = {'full_samples':None,'elements':list(range(2))} # Notice, if we do not care permutation of Ising model's states, we only need 2 actions
     word = Word(args, evidences) #initialization of the word object requires elements and end element have to be specified as 'end'
-    selected_samples = [[0,1,0,1,1,1,1,1,-1], [0,1,1,0,0,0,0,1,-1],[0,0,1,1,0,1,1,0,-1],[1,1,0,0,0,0,1,0,-1],[0,0,1,1,0,1,0,0,-1]]
-    trans = translator()
+    selected_samples =  [[0,1,0,1,1,1,1,1,-1], [0,1,1,0,0,0,0,1,-1], [0,0,1,1,0,1,1,0,-1], [1,1,0,0,0,0,1,0,-1], [0,0,1,1,0,1,0,0,-1]]
     selected_samples_states = trans.translate(selected_samples,env= env_Ising)
     selected_samples_rewards = env_Ising.log_reward(final_states = selected_samples_states)
+    breakpoint()
+    # print('The reward of the root state is: ', env_Ising.log_reward(trans.translate([],env=env_Ising)))
     print('the rewards of known trajectories are: ', selected_samples_rewards)
     all_sampled_trajectories.update({tuple(s): r.item() for s , r in zip(selected_samples,selected_samples_rewards)})
     annotated_selected_samples = {'object':selected_samples, 'rewards': selected_samples_rewards}
     Gflownet_active_learning_Ising = Gflow_extrapolate(args, word, annotated_selected_samples) # the selected samples are pre-learnt
     Gflownet_active_learning_Ising.backward_reward_propagation(Gflownet_active_learning_Ising.get_root()) # if the initialization is with samples, backward propagation is required
+    print('total unique trajectories is: ', len(all_sampled_trajectories), 'and it equals to???', Gflownet_active_learning_Ising.samples_structure.num_sentences, ' ???')
     print(Gflownet_active_learning_Ising.samples_structure.top_flows.peek_top_n(3))
     print(Gflownet_active_learning_Ising.get_states_flows())
-    breakpoint()
     for i in range(5):
+        print('check all the states flows: ', Gflownet_active_learning_Ising.samples_structure.get_All_states_flow(leaf_only=True))
+        breakpoint()
         trajectories = Gflownet_active_learning_Ising.sample_trajectories(n_samples = 3, env= env_Ising)
         print('sampled trajectories are: ', trajectories)
         translated_trajectories = trans.translate(trajectories)
@@ -130,16 +143,15 @@ def main(args):
         print(Gflownet_active_learning_Ising.samples_structure.top_flows.peek_top_n(3))
         print(Gflownet_active_learning_Ising.get_states_flows())
         all_sampled_trajectories.update({tuple(s): r.item() for s , r in zip(trajectories, trajectories_rewards)})
-    counts = 0
+        print('total unique trajectories is: ', len(all_sampled_trajectories), 'and it equals to???', Gflownet_active_learning_Ising.samples_structure.num_sentences, ' ???')
     total_reward = 0
     for v in all_sampled_trajectories.values():
         total_reward += v
-        counts +=1
     print('total reward is : ',total_reward, 'and it equals to???: ',Gflownet_active_learning_Ising.samples_structure.root.flow, ' ???')
-    print('total unique trajectories is: ', counts, 'and it equals to???', Gflownet_active_learning_Ising.samples_structure.num_sentences, ' ???')
+    print('total unique trajectories is: ', len(all_sampled_trajectories), 'and it equals to???', Gflownet_active_learning_Ising.samples_structure.num_sentences, ' ???')
     print('top 3 flows :', Gflownet_active_learning_Ising.samples_structure.top_flows.peek_top_n(3))
-    print('average reward is : ', total_reward/counts)
-
+    print('average reward is : ', total_reward/len(all_sampled_trajectories))
+    print('check all the leaf flows: ', Gflownet_active_learning_Ising.samples_structure.get_All_states_flow(leaf_only=True))
    # Supervised learning setting
     breakpoint()
     #we can improve upon the sampling of ground truths
