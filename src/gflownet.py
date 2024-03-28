@@ -155,6 +155,7 @@ class Gflow_Trie(Trie):
                 break
         # mark last node as leaf
         if pCrawl.flow:
+            pCrawl.attempts +=1
             assert pCrawl.flow == reward
             assert pCrawl.end_of_Sentence == True
         else:
@@ -204,7 +205,8 @@ class Gflow_Trie(Trie):
                 children = node.children
                 if node.children[-1]:
                     if node.children[-1].end_of_Sentence:
-                        print('for the state: ', self.get_sentence(node), 'the reward of that state is: ',node.children[-1].flow)
+                        if node.children[-1].flow >0: #!!!Temperary logic!!!
+                            print('for the state: ', self.get_sentence(node), 'the reward of that state is: ',node.children[-1].flow, 'the total attempts of that state is: ', node.children[-1].attempts)
                 for i in range(self.vocab_size-1): #we dont add the stop states
                     child = children[i]
                     queue.append(child)

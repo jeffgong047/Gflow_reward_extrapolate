@@ -7,16 +7,17 @@ import networkx as nx
 import heapq
 
 class MaxHeap:
-    def __init__(self,max_size = 20 ):
+    def __init__(self,max_size = 64 ):
         self.heap = []
         self.max_size = max_size # Maximum size of the heap
 
     def push(self, val, obj):
         # Store a tuple of (inverted val, obj) to maintain max heap behavior
+        if len(self.heap)+1 == self.max_size:
+            self.heap.pop()  #notice heap.pop is totally different to pop
         heapq.heappush(self.heap, (-val, obj))
         # If the heap size exceeds max_size, remove the smallest element
-        if len(self.heap) > self.max_size:
-            heapq.heappop(self.heap)
+
 
     def pop(self):
         # Invert the value back and return both the value and the object

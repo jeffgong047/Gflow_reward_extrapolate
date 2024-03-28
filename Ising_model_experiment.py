@@ -97,7 +97,18 @@ def main(args):  # noqa: C901
                 wandb.log(validation_info, step=iteration)
             to_log.update(validation_info)
             tqdm.write(f"{iteration}: {to_log}")
-
+    list_visited_terminating_states = visited_terminating_states.tensor.tolist()
+    unique_modes_found = {}
+    breakpoint()
+    for e in list_visited_terminating_states:
+        e = tuple(e)
+        if e in unique_modes_found.keys():
+            unique_modes_found[e] +=1
+        else:
+            unique_modes_found[e] = 1
+    print(unique_modes_found)
+    rewards = env.log_reward(unique_modes_found.keys())
+    print(rewards)
     return validation_info["l1_dist"]
 
 

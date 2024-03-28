@@ -108,14 +108,14 @@ def main(args):
     # breakpoint()
     #2)try Ising models
     all_sampled_trajectories = {}
-    env_Ising = DiscreteEBM(ndim=8, alpha=1.0, device_str=0)
+    env_Ising = DiscreteEBM(ndim=10, alpha=1.0, device_str=0)
     all_states = enumerate_Ising_states(env_Ising.ndim)
     trans = translator()
     all_states_rewards = env_Ising.log_reward(trans.translate(all_states, env= env_Ising))
     print( all_states_rewards )
     evidences = {'full_samples':None,'elements':list(range(2))} # Notice, if we do not care permutation of Ising model's states, we only need 2 actions
     word = Word(args, evidences) #initialization of the word object requires elements and end element have to be specified as 'end'
-    selected_samples =  [[0,1,0,1,1,1,1,1,-1], [0,1,1,0,0,0,0,1,-1], [0,0,1,1,0,1,1,0,-1], [1,1,0,0,0,0,1,0,-1], [0,0,1,1,0,1,0,0,-1]]
+    selected_samples =  [[0,1,0,1,1,1,1,1,1,1,-1], [0,1,1,0,0,0,0,1,1,1,-1], [0,0,1,1,0,1,1,0,1,1,-1], [1,1,0,0,0,0,1,0,1,1,-1], [0,0,1,1,0,1,0,0,1,1,-1]]
     selected_samples_states = trans.translate(selected_samples,env= env_Ising)
     selected_samples_rewards = env_Ising.log_reward(final_states = selected_samples_states)
     breakpoint()
@@ -128,19 +128,20 @@ def main(args):
     print('total unique trajectories is: ', len(all_sampled_trajectories), 'and it equals to???', Gflownet_active_learning_Ising.samples_structure.num_sentences, ' ???')
     print(Gflownet_active_learning_Ising.samples_structure.top_flows.peek_top_n(3))
     print(Gflownet_active_learning_Ising.get_states_flows())
-    for i in range(5):
+    reward_intensity = []
+    for i in range(18):
         print('check all the states flows: ', Gflownet_active_learning_Ising.samples_structure.get_All_states_flow(leaf_only=True))
-        breakpoint()
-        trajectories = Gflownet_active_learning_Ising.sample_trajectories(n_samples = 3, env= env_Ising)
+        trajectories = Gflownet_active_learning_Ising.sample_trajectories(n_samples = 5, env= env_Ising)
         print('sampled trajectories are: ', trajectories)
         translated_trajectories = trans.translate(trajectories)
         trajectories_rewards = env_Ising.log_reward(final_states = translated_trajectories)
+        reward_intensity.append(sum(trajectories_rewards)/len(trajectories_rewards))
         annotated_trajectories = {'object': trajectories, 'rewards': trajectories_rewards}
         Gflownet_active_learning_Ising.dynamic_insert(annotated_trajectories)
         print('corresponding rewards of these trajectories are: ', trajectories_rewards)
         print('lets take a look at top 3 values')
         print('Total explored states are: ', Gflownet_active_learning_Ising.samples_structure.num_sentences)
-        print(Gflownet_active_learning_Ising.samples_structure.top_flows.peek_top_n(3))
+        print(Gflownet_active_learning_Ising.samples_structure.top_flows.peek_top_n(10))
         print(Gflownet_active_learning_Ising.get_states_flows())
         all_sampled_trajectories.update({tuple(s): r.item() for s , r in zip(trajectories, trajectories_rewards)})
         print('total unique trajectories is: ', len(all_sampled_trajectories), 'and it equals to???', Gflownet_active_learning_Ising.samples_structure.num_sentences, ' ???')
@@ -152,7 +153,9 @@ def main(args):
     print('top 3 flows :', Gflownet_active_learning_Ising.samples_structure.top_flows.peek_top_n(3))
     print('average reward is : ', total_reward/len(all_sampled_trajectories))
     print('check all the leaf flows: ', Gflownet_active_learning_Ising.samples_structure.get_All_states_flow(leaf_only=True))
+    print('reward intensity', reward_intensity)
    # Supervised learning setting
+    breakpoint()
     breakpoint()
     #we can improve upon the sampling of ground truths
     train_data_flows, test_data_flows = train_test_split(list(zip(edge_features,edge_flows)),test_size = 0.2)
