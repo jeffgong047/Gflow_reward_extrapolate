@@ -85,8 +85,6 @@ class extrapolate_Policy(Sampler):
         if state_children[-1] is None:
             state_children[-1] = self.memory.getNode()
             state_children[-1].add_parent(-1,state)
-        state_children[-1].flow = state_reward
-        state_children[-1].end_of_Sentence = True
         state_flows = []
         for child in state_children[:-1]:
             if child:

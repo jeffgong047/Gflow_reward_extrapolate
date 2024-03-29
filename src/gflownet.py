@@ -154,22 +154,20 @@ class Gflow_Trie(Trie):
             if index==-1: # handle padding in a lazy way
                 break
         # mark last node as leaf
-        if pCrawl.flow:
-            pCrawl.attempts +=1
-            assert pCrawl.flow == reward
+        assert index ==-1
+        if pCrawl.end_of_Sentence:
+            try:
+                assert pCrawl.flow == reward
+            except:
+                breakpoint()
             assert pCrawl.end_of_Sentence == True
         else:
+            assert pCrawl.attempts == 1
             pCrawl.end_of_Sentence = True  #pCrawl is after taking the end action
             pCrawl.flow = reward
+            pCrawl.attempts +=1
             self.top_flows.push(reward.item(),key)
             self.num_sentences += 1
-        try:
-            assert index == -1
-        except:
-            breakpoint()
-            a=1
-            b=2
-            c=a+b
 
 
     def get_edge_flow(self,source,target):
@@ -422,7 +420,10 @@ class Gflow_extrapolate(GFlowNet):
         :return:
         '''
         if state.flow is not None:  # the assumption is wrong which introduce logical bug. The flow has been inserted before this function being called
-            assert state.flow == flows
+            try:
+                assert state.flow == flows
+            except:
+                breakpoint()
             if all([self.equilibrium(s) for s in state.parents]):
                 return
 

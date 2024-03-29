@@ -52,7 +52,13 @@ def visualize_prediction_accuracy(predictions, targets):
     plt.savefig('./prediction_accuracy.png')
     plt.show()
 
-
+def update_dict_frequency(dict, keys):
+    for k in keys:
+        k = tuple(k)
+        if k in dict.keys():
+            dict[k] +=1
+        else:
+            dict[k] = 1
 
 
 def main(args):
@@ -108,6 +114,7 @@ def main(args):
     # breakpoint()
     #2)try Ising models
     all_sampled_trajectories = {}
+    explored_states_n_rewards = {}
     env_Ising = DiscreteEBM(ndim=10, alpha=1.0, device_str=0)
     all_states = enumerate_Ising_states(env_Ising.ndim)
     trans = translator()
@@ -121,16 +128,21 @@ def main(args):
     breakpoint()
     # print('The reward of the root state is: ', env_Ising.log_reward(trans.translate([],env=env_Ising)))
     print('the rewards of known trajectories are: ', selected_samples_rewards)
-    all_sampled_trajectories.update({tuple(s): r.item() for s , r in zip(selected_samples,selected_samples_rewards)})
+    explored_states_n_rewards.update({tuple(s): r.item() for s , r in zip(selected_samples,selected_samples_rewards)})
+    update_dict_frequency(all_sampled_trajectories,selected_samples)
     annotated_selected_samples = {'object':selected_samples, 'rewards': selected_samples_rewards}
     Gflownet_active_learning_Ising = Gflow_extrapolate(args, word, annotated_selected_samples) # the selected samples are pre-learnt
     Gflownet_active_learning_Ising.backward_reward_propagation(Gflownet_active_learning_Ising.get_root()) # if the initialization is with samples, backward propagation is required
-    print('total unique trajectories is: ', len(all_sampled_trajectories), 'and it equals to???', Gflownet_active_learning_Ising.samples_structure.num_sentences, ' ???')
+    print('total unique trajectories is: ', len(explored_states_n_rewards), 'and it equals to???', Gflownet_active_learning_Ising.samples_structure.num_sentences, ' ???')
     print(Gflownet_active_learning_Ising.samples_structure.top_flows.peek_top_n(3))
     print(Gflownet_active_learning_Ising.get_states_flows())
     reward_intensity = []
     for i in range(18):
         print('check all the states flows: ', Gflownet_active_learning_Ising.samples_structure.get_All_states_flow(leaf_only=True))
+        if len(explored_states_n_rewards) != Gflownet_active_learning_Ising.samples_structure.num_sentences:
+            print('number of uniquely explored states ', len(explored_states_n_rewards), 'number of sentences recorded by Gflow++: ',Gflownet_active_learning_Ising.samples_structure.num_sentences)
+            print('all of the sampled trajectories ', all_sampled_trajectories)
+            breakpoint()
         trajectories = Gflownet_active_learning_Ising.sample_trajectories(n_samples = 5, env= env_Ising)
         print('sampled trajectories are: ', trajectories)
         translated_trajectories = trans.translate(trajectories)
@@ -143,15 +155,16 @@ def main(args):
         print('Total explored states are: ', Gflownet_active_learning_Ising.samples_structure.num_sentences)
         print(Gflownet_active_learning_Ising.samples_structure.top_flows.peek_top_n(10))
         print(Gflownet_active_learning_Ising.get_states_flows())
-        all_sampled_trajectories.update({tuple(s): r.item() for s , r in zip(trajectories, trajectories_rewards)})
-        print('total unique trajectories is: ', len(all_sampled_trajectories), 'and it equals to???', Gflownet_active_learning_Ising.samples_structure.num_sentences, ' ???')
+        explored_states_n_rewards.update({tuple(s): r.item() for s , r in zip(trajectories, trajectories_rewards)})
+        update_dict_frequency(all_sampled_trajectories,trajectories)
+        print('total unique trajectories is: ', len(explored_states_n_rewards), 'and it equals to???', Gflownet_active_learning_Ising.samples_structure.num_sentences, ' ???')
     total_reward = 0
-    for v in all_sampled_trajectories.values():
+    for v in explored_states_n_rewards.values():
         total_reward += v
     print('total reward is : ',total_reward, 'and it equals to???: ',Gflownet_active_learning_Ising.samples_structure.root.flow, ' ???')
-    print('total unique trajectories is: ', len(all_sampled_trajectories), 'and it equals to???', Gflownet_active_learning_Ising.samples_structure.num_sentences, ' ???')
+    print('total unique trajectories is: ', len(explored_states_n_rewards), 'and it equals to???', Gflownet_active_learning_Ising.samples_structure.num_sentences, ' ???')
     print('top 3 flows :', Gflownet_active_learning_Ising.samples_structure.top_flows.peek_top_n(3))
-    print('average reward is : ', total_reward/len(all_sampled_trajectories))
+    print('average reward is : ', total_reward/len(explored_states_n_rewards))
     print('check all the leaf flows: ', Gflownet_active_learning_Ising.samples_structure.get_All_states_flow(leaf_only=True))
     print('reward intensity', reward_intensity)
    # Supervised learning setting
